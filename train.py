@@ -77,16 +77,16 @@ def train_main(args):
 
     trainset = Dataset('train', args)
     train_sampler = CategoriesSampler(trainset.label, len(trainset.data) // args.batch, args.way, args.shot + args.query)
-    train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8, pin_memory=True)
+    train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8, pin_memory=False)
 
     trainset_aux = Dataset('train', args)
-    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=True, num_workers=8, pin_memory=True)
+    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=False, num_workers=8, pin_memory=False)
 
     train_loaders = {'train_loader': train_loader, 'train_loader_aux': train_loader_aux}
 
     valset = Dataset('val', args)
     val_sampler = CategoriesSampler(valset.label, args.val_episode, args.way, args.shot + args.query)
-    val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=8, pin_memory=True)
+    val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=8, pin_memory=False)
     ''' fix val set for all epochs '''
     val_loader = [x for x in val_loader]
 

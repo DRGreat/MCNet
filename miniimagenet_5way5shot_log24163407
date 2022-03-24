@@ -1,3 +1,12 @@
 [train] epo:  1 | avg.loss:7.5230 | avg.acc:50.796
 [val] epo:  1 | avg.loss:1.2071 | avg.acc:51.700
 
+[train] epo:  2 | avg.loss:6.3047 | avg.acc:59.880
+[val] epo:  2 | avg.loss:1.0761 | avg.acc:59.640
+
+[train] epo:  3 | avg.loss:5.5542 | avg.acc:66.924
+[val] epo:  3 | avg.loss:1.0029 | avg.acc:62.440
+
+[train] epo:  4 | avg.loss:5.0895 | avg.acc:68.791
+[val] epo:  4 | avg.loss:0.9673 | avg.acc:65.707
+
