@@ -112,7 +112,10 @@ def set_seed(seed):
 
 def detect_grad_nan(model):
     for param in model.parameters():
-        if (param.grad != param.grad).float().sum() != 0:  # nan detected
+        tmp = param.grad != param.grad
+        if isinstance(tmp,bool):
+            tmp = torch.tensor([tmp])
+        if tmp.float().sum() != 0:  # nan detected
             param.grad.zero_()
 
 
