@@ -15,6 +15,8 @@ from models.dataloader.data_utils import dataset_builder
 from models.renet import RENet
 from test import test_main, evaluate
 
+logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
+
 
 def train(epoch, model, loader, optimizer, args=None):
     model.train()
@@ -107,6 +109,10 @@ def train_main(args):
 
         train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
         val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
+
+        with open(f"miniimagenet_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+            f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
+            f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
 
         if not args.no_wandb:
             wandb.log({'train/loss': train_loss, 'train/acc': train_acc, 'val/loss': val_loss, 'val/acc': val_acc}, step=epoch)

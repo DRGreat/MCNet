@@ -1,0 +1,3 @@
+[train] epo:  1 | avg.loss:7.5230 | avg.acc:50.796
+[val] epo:  1 | avg.loss:1.2071 | avg.acc:51.700
+
