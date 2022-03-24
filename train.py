@@ -78,10 +78,8 @@ def train_main(args):
     trainset = Dataset('train', args)
     train_sampler = CategoriesSampler(trainset.label, len(trainset.data) // args.batch, args.way, args.shot + args.query)
     train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8, pin_memory=False)
-
     trainset_aux = Dataset('train', args)
-    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=False, num_workers=8, pin_memory=False)
-
+    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=True, num_workers=8, pin_memory=False,drop_last=True)
     train_loaders = {'train_loader': train_loader, 'train_loader_aux': train_loader_aux}
 
     valset = Dataset('val', args)
