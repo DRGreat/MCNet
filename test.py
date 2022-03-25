@@ -57,6 +57,7 @@ def test_main(model, args):
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
     print(f'[final] epo:{"best":>3} | {by(test_acc)} +- {test_ci:.3f}')
+    
 
     return test_acc, test_ci
 
