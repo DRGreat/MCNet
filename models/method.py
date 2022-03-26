@@ -11,6 +11,27 @@ from models.others.nlsa import NonLocalSelfAttention
 from models.others.sce import SpatialContextEncoder
 from torchvision import transforms as T
 import numpy as np
+from models.resnet import conv3x3
+
+class AugmentedCNN(nn.Module):
+    def __init__(self):
+        super(AugmentedCNN, self).__init__()
+
+        self.conv = conv3x3(640*4,640*4)
+        self.bn = nn.BatchNorm2d(640*4)
+        self.relu = nn.LeakyReLU(0.1)
+
+    def forward(self,x):
+        residual = x
+
+        out = self.conv(x)
+        out = self.bn(out)
+        out = self.relu(out)
+        out = out * residual
+
+        return out
+
+
 
 
 
@@ -25,7 +46,7 @@ class Method(nn.Module):
         self.encoder_dim = 640
         self.fc = nn.Linear(self.encoder_dim*4, self.args.num_class)
         self.scr_module = self._make_scr_layer(planes=[640, 64, 64, 64, 640])
-        self.attention = nn.MultiheadAttention(embed_dim=640, num_heads=1, batch_first=True)
+        self.augmented_cnn = AugmentedCNN()
 
     def _make_scr_layer(self, planes):
         stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
@@ -134,14 +155,16 @@ class Method(nn.Module):
                 x_h = x_h + identity_h
                 x_v = x_v + identity_v
                 x_r = x_r + identity_r #[100,640,5,5]
-            # x = self.gaussian_normalize(F.relu(x, inplace=True),dim=1).mean(dim=[-1,-2]).unsqueeze(1) #[100,1,640]
-            # x_h = self.gaussian_normalize(F.relu(x_h, inplace=True),dim=1).mean(dim=[-1,-2]).unsqueeze(1) #[100,1,640]
-            # x_v = self.gaussian_normalize(F.relu(x_v, inplace=True),dim=1).mean(dim=[-1,-2]).unsqueeze(1) #[100,1,640]
-            # x_r = self.gaussian_normalize(F.relu(x_r, inplace=True),dim=-1).mean(dim=[-1,-2]).unsqueeze(1) #[100,1,640]
-            x = torch.cat([x,x_h,x_v,x_r],dim=1)
-            # x, _ = self.attention(x,x,x)
-            # x = self.gaussian_normalize(x,dim=1)
-            # x = x.contiguous().view(-1,self.encoder_dim*4)
-            
+
+            x = torch.cat([x,x_h,x_v,x_r],dim=1) #[100,640*4,5,5]
+
+            #再过一下卷积层
+
+
+            x = self.augmented_cnn(x)
+
+            # import sys
+            # sys.exit(0)
+
 
             return x
