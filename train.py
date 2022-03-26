@@ -22,8 +22,8 @@ logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
 
 def train(epoch, model, loader, optimizer, args=None):
     model.train()
-
-    train_loader = loader
+    train_loader = loader['train_loader']
+    train_loader_aux = loader['train_loader_aux']
 
     # label for query set, always in the same pattern
     label = torch.arange(args.way).repeat(args.query).cuda()  # 012340123401234...
@@ -34,22 +34,33 @@ def train(epoch, model, loader, optimizer, args=None):
     k = args.way * args.shot
     tqdm_gen = tqdm.tqdm(train_loader)
 
-    for i, (data, train_labels) in enumerate(tqdm_gen, 1):
-
+    for i, ((data, train_labels), (data_aux, train_labels_aux)) in enumerate(zip(tqdm_gen, train_loader_aux), 1):
+    
         data, train_labels = data.cuda(), train_labels.cuda()
+        data_aux, train_labels_aux = data_aux.cuda(), train_labels_aux.cuda()
+
 
         # Forward images (3, 84, 84) -> (C, H, W)
         model.module.mode = 'encoder'
         data = model(data)
+        data_aux = model(data_aux)  # I prefer to separate feed-forwarding data and data_aux due to BN
+
 
         # loss for batch
         model.module.mode = 'cca'
         data_shot, data_query = data[:k], data[k:]
-        logits, _ = model((data_shot.unsqueeze(0).repeat(args.num_gpu, 1, 1, 1, 1), data_query))
+        logits, absolute_logits = model((data_shot.unsqueeze(0).repeat(args.num_gpu, 1, 1, 1, 1), data_query))
         epi_loss = F.cross_entropy(logits, label)
+        absolute_loss = F.cross_entropy(absolute_logits, train_labels[k:])
 
+        # loss for auxiliary batch
+        model.module.mode = 'fc'
+        logits_aux = model(data_aux)
+        loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
+        loss_aux = loss_aux + absolute_loss
 
-        loss = epi_loss
+        loss = args.lamb * epi_loss + loss_aux
+
         acc = compute_accuracy(logits, label)
 
         loss_meter.update(loss.item())
@@ -72,6 +83,12 @@ def train_main(args):
     train_sampler = CategoriesSampler(trainset.label, len(trainset.data) // args.batch, args.way, args.shot + args.query)
     train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8, pin_memory=False)
 
+    trainset_aux = Dataset('train', args)
+    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=True, num_workers=8, pin_memory=False)
+
+    train_loaders = {'train_loader': train_loader, 'train_loader_aux': train_loader_aux}
+
+
     valset = Dataset('val', args)
     val_sampler = CategoriesSampler(valset.label, args.val_episode, args.way, args.shot + args.query)
     val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=8, pin_memory=False)
@@ -79,9 +96,9 @@ def train_main(args):
     val_loader = [x for x in val_loader]
 
     set_seed(args.seed)
-    # model = RENet(args).cuda()
+    model = RENet(args).cuda()
     # model = ProtoNet(args).cuda()
-    model = Method(args).cuda()
+    # model = Method(args).cuda()
 
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
@@ -98,10 +115,10 @@ def train_main(args):
     for epoch in range(1, args.max_epoch + 1):
         start_time = time.time()
 
-        train_loss, train_acc, _ = train(epoch, model, train_loader, optimizer, args)
+        train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
         val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
 
-        with open(f"miniimagenet_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        with open(f"{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
             f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
 
@@ -132,7 +149,7 @@ if __name__ == '__main__':
 
     model = train_main(args)
     test_acc, test_ci = test_main(model, args)
-    with open(f"miniimagenet_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+    with open(f"{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
             f.write(f'[final] epo:best | avg.acc:{test_acc:.3f}\n\n')
 
     if not args.no_wandb:
