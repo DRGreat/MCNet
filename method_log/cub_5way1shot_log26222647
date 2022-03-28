@@ -1,3 +1,6 @@
+不是很理想，换方法吧
+
+
 [train] epo:  1 | avg.loss:12.0378 | avg.acc:37.819
 [val] epo:  1 | avg.loss:1.2564 | avg.acc:51.513
 
