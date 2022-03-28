@@ -11,6 +11,7 @@ from common.utils import compute_accuracy, load_model, setup_run, by
 from models.dataloader.samplers import CategoriesSampler
 from models.dataloader.data_utils import dataset_builder
 from models.renet import RENet
+from models.method import Method
 
 
 def evaluate(epoch, model, loader, args=None, set='val'):
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     args = setup_run(arg_mode='test')
 
     ''' define model '''
-    model = RENet(args).cuda()
+    model = Method(args).cuda()
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
     test_main(model, args)

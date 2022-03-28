@@ -96,9 +96,9 @@ def train_main(args):
     val_loader = [x for x in val_loader]
 
     set_seed(args.seed)
-    model = RENet(args).cuda()
+    # model = RENet(args).cuda()
     # model = ProtoNet(args).cuda()
-    # model = Method(args).cuda()
+    model = Method(args).cuda()
 
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
