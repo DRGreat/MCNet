@@ -20,7 +20,7 @@ class Method(nn.Module):
         self.args = args
 
         # self.encoder = ResNet(args=args)
-        self.encoder = ResNet18()
+        self.encoder = ResNet18(freeze=False)
         self.encoder_dim = 512
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
 

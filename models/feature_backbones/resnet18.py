@@ -4,9 +4,12 @@ import torch.nn as nn
 
 
 class ResNet18(nn.Module):
-    def __init__(self):
+    def __init__(self,freeze=False):
         super(ResNet18,self).__init__()
         self.backbone = models.resnet18(pretrained=True)
+        if freeze:
+            for param in self.backbone.parameters():
+                param.requires_grad = False
     def forward(self,img):
         feat = self.backbone.conv1.forward(img)
         feat = self.backbone.bn1.forward(feat)
