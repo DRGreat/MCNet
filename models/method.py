@@ -3,36 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.resnet import ResNet
+from models.feature_backbones.resnet18 import ResNet18
 from models.cca import CCA
 from models.scr import SCR, SelfCorrelationComputation
 from models.others.se import SqueezeExcitation
 from models.others.lsa import LocalSelfAttention
 from models.others.nlsa import NonLocalSelfAttention
 from models.others.sce import SpatialContextEncoder
-from torchvision import transforms as T
-import numpy as np
-from models.resnet import conv3x3
-
-class AugmentedCNN(nn.Module):
-    def __init__(self):
-        super(AugmentedCNN, self).__init__()
-
-        self.conv = conv3x3(640*4,640*4)
-        self.bn = nn.BatchNorm2d(640*4)
-        self.relu = nn.LeakyReLU(0.1)
-
-    def forward(self,x):
-        residual = x
-
-        out = self.conv(x)
-        out = self.bn(out)
-        out = self.relu(out)
-        out = out * residual
-
-        return out
-
-
-
 
 
 class Method(nn.Module):
@@ -42,14 +19,20 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        self.encoder = ResNet(args=args)
-        self.encoder_dim = 640
-        self.fc = nn.Linear(self.encoder_dim*4, self.args.num_class)
-        self.scr_module = self._make_scr_layer(planes=[640, 64, 64, 64, 640])
-        self.augmented_cnn = AugmentedCNN()
+        # self.encoder = ResNet(args=args)
+        self.encoder = ResNet18()
+        self.encoder_dim = 512
+        self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
+
+        self.scr_module = self._make_scr_layer(planes=[512, 64, 64, 64, 512])
+        self.cca_1x1 = nn.Sequential(
+            nn.Conv2d(self.encoder_dim, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        )
 
     def _make_scr_layer(self, planes):
-        stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+        stride, kernel_size, padding = (1, 1, 1), (3, 3), 1
         layers = list()
 
         if self.args.self_method == 'scr':
@@ -79,7 +62,7 @@ class Method(nn.Module):
             return self.encode(input, False)
         elif self.mode == 'cca':
             spt, qry = input
-            return self.smlrty(spt, qry)
+            return self.cca(spt, qry)
         else:
             raise ValueError('Unknown mode')
 
@@ -87,84 +70,87 @@ class Method(nn.Module):
         x = x.mean(dim=[-1, -2])
         return self.fc(x)
 
-    def smlrty(self, spt, qry):
-
-        num_qry, way, shot = self.args.query, self.args.way, self.args.shot
+    def cca(self, spt, qry):
         spt = spt.squeeze(0)
-        
 
         # shifting channel activations by the channel mean
-        spt = self.gaussian_normalize(spt,dim=1)
-        qry = self.gaussian_normalize(qry,dim=1)
-        
-        spt_ = spt.mean(dim=[-1,-2]).contiguous().view(shot,way,-1).mean(dim=0)
-        qry_ = qry.mean(dim=[-1,-2])
-        spt_ext = spt_.unsqueeze(0).repeat(num_qry*way,1,1).contiguous().view(num_qry*way*way,-1)
-        qry_ext = qry_.unsqueeze(1).repeat(1,way,1).contiguous().view(num_qry*way*way,-1)
+        spt = self.normalize_feature(spt)
+        qry = self.normalize_feature(qry)
 
-        similarity_matrix = -F.pairwise_distance(spt_ext,qry_ext,p=2).contiguous().view(num_qry*way,way)
+        way = spt.shape[0]
+        num_qry = qry.shape[0]
 
+        spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1)
+        qry_attended = qry.unsqueeze(1).repeat(1, way, 1, 1, 1)
+
+        # averaging embeddings for k > 1 shots
+        if self.args.shot > 1:
+            spt_attended = spt_attended.view(num_qry, self.args.shot, num_qry, *spt_attended.shape[2:])
+            qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
+            spt_attended = spt_attended.mean(dim=1)
+            qry_attended = qry_attended.mean(dim=1)
+
+        # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
+        # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
+        spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
+        qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
+        qry_pooled = qry.mean(dim=[-1, -2])
+
+        similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)
+        # similarity_matrix = -F.pairwise_distance(spt_attended_pooled.view(num_qry*self.args.way,-1), qry_attended_pooled.view(num_qry*self.args.way,-1), p=2).view(num_qry,self.args.way)
 
         if self.training:
-            return similarity_matrix , self.fc(qry_)
+            return similarity_matrix / self.args.temperature, self.fc(qry_pooled)
         else:
-            return similarity_matrix
+            return similarity_matrix / self.args.temperature
 
     def gaussian_normalize(self, x, dim, eps=1e-05):
         x_mean = torch.mean(x, dim=dim, keepdim=True)
         x_var = torch.var(x, dim=dim, keepdim=True)
-
         x = torch.div(x - x_mean, torch.sqrt(x_var + eps))
         return x
 
+    def get_4d_correlation_map(self, spt, qry):
+        '''
+        The value H and W both for support and query is the same, but their subscripts are symbolic.
+        :param spt: way * C * H_s * W_s
+        :param qry: num_qry * C * H_q * W_q
+        :return: 4d correlation tensor: num_qry * way * H_s * W_s * H_q * W_q
+        :rtype:
+        '''
+        way = spt.shape[0]
+        num_qry = qry.shape[0]
+
+        # reduce channel size via 1x1 conv
+        spt = self.cca_1x1(spt)
+        qry = self.cca_1x1(qry)
+
+        # normalize channels for later cosine similarity
+        spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
+        qry = F.normalize(qry, p=2, dim=1, eps=1e-8)
+
+        # num_way * C * H_p * W_p --> num_qry * way * H_p * W_p
+        # num_qry * C * H_q * W_q --> num_qry * way * H_q * W_q
+        spt = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1)
+        qry = qry.unsqueeze(1).repeat(1, way, 1, 1, 1)
+        similarity_map_einsum = torch.einsum('qncij,qnckl->qnijkl', spt, qry)
+        return similarity_map_einsum
 
     def normalize_feature(self, x):
         return x - x.mean(1).unsqueeze(1)
 
     def encode(self, x, do_gap=True):
-        # creating augmented data by applying three kinds of transfrom
-        hflipper = T.RandomHorizontalFlip(p=1) #水平翻转
-        vflipper = T.RandomVerticalFlip(p=1) #上下翻转
-        rotater = T.RandomRotation([-90,-90]) #顺时针90度翻转
-
-        x_h = torch.stack([hflipper(x[i]) for i in range(len(x))])
-        x_v = torch.stack([vflipper(x[i]) for i in range(len(x))])
-        x_r = torch.stack([rotater(x[i]) for i in range(len(x))])
-
-
-       
-
         x = self.encoder(x)
-        x_h = self.encoder(x_h)
-        x_v = self.encoder(x_v)
-        x_r = self.encoder(x_r)
 
         if self.args.self_method:
             identity = x
-            identity_h = x_h
-            identity_v = x_v
-            identity_r = x_r
-
             x = self.scr_module(x)
-            x_h = self.scr_module(x_h)
-            x_v = self.scr_module(x_v)
-            x_r = self.scr_module(x_r)
 
             if self.args.self_method == 'scr':
                 x = x + identity
-                x_h = x_h + identity_h
-                x_v = x_v + identity_v
-                x_r = x_r + identity_r #[100,640,5,5]
+            x = F.relu(x, inplace=True)
 
-            x = torch.cat([x,x_h,x_v,x_r],dim=1) #[100,640*4,5,5]
-
-            #再过一下卷积层
-
-
-            x = self.augmented_cnn(x)
-
-            # import sys
-            # sys.exit(0)
-
-
+        if do_gap:
+            return F.adaptive_avg_pool2d(x, 1)
+        else:
             return x
