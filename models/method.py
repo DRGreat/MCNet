@@ -10,17 +10,27 @@ from models.others.se import SqueezeExcitation
 from models.others.lsa import LocalSelfAttention
 from models.others.nlsa import NonLocalSelfAttention
 from models.others.sce import SpatialContextEncoder
+from models.cats import TransformerAggregator
+from functools import reduce, partial
+from models.mod import FeatureL2Norm
 
 
 class Method(nn.Module):
 
-    def __init__(self, args, mode=None):
+    def __init__(self, 
+    args, 
+    mode=None,
+    feature_size=3,
+    feature_proj_dim=3,
+    depth=4,
+    num_heads=6,
+    mlp_ratio=4):
         super().__init__()
         self.mode = mode
         self.args = args
 
         # self.encoder = ResNet(args=args)
-        self.encoder = ResNet18(freeze=False)
+        self.encoder = ResNet18(freeze=False,feature_size=feature_size)
         self.encoder_dim = 960
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
 
@@ -32,7 +42,40 @@ class Method(nn.Module):
             self._make_scr_layer(planes=[512, 64, 64, 64, 512])
             ]
         )
-       
+
+        self.feature_size = feature_size
+        self.feature_proj_dim = feature_proj_dim
+        self.decoder_embed_dim = self.feature_size ** 2 + self.feature_proj_dim
+        
+        channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
+        hyperpixel_ids = [2,4,6,8]
+        self.proj = nn.ModuleList([
+            nn.Linear(channels[i], self.feature_proj_dim) for i in hyperpixel_ids
+        ])
+
+        self.decoder = TransformerAggregator(
+            img_size=self.feature_size, embed_dim=self.decoder_embed_dim, depth=depth, num_heads=num_heads,
+            mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
+            num_hyperpixel=len(hyperpixel_ids))
+            
+        self.l2norm = FeatureL2Norm()
+
+
+    def corr(self, src, trg):
+        return src.flatten(2).transpose(-1, -2) @ trg.flatten(2)
+
+    def mutual_nn_filter(self, correlation_matrix):
+        r"""Mutual nearest neighbor filtering (Rocco et al. NeurIPS'18)"""
+        corr_src_max = torch.max(correlation_matrix, dim=3, keepdim=True)[0]
+        corr_trg_max = torch.max(correlation_matrix, dim=2, keepdim=True)[0]
+        corr_src_max[corr_src_max == 0] += 1e-30
+        corr_trg_max[corr_trg_max == 0] += 1e-30
+
+        corr_src = correlation_matrix / corr_src_max
+        corr_trg = correlation_matrix / corr_trg_max
+
+        return correlation_matrix * (corr_src * corr_trg)
+
 
     def _make_scr_layer(self, planes):
         stride, kernel_size, padding = (1, 1, 1), (3, 3), 1
@@ -67,15 +110,62 @@ class Method(nn.Module):
     def cca(self, spt, qry):
         spt = spt.squeeze(0)
 
-        # shifting channel activations by the channel mean
-        spt = self.normalize_feature(spt)
-        qry = self.normalize_feature(qry)
+        channels = [64,128,256,512]
+        
 
         way = spt.shape[0]
         num_qry = qry.shape[0]
 
-        spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1)
-        qry_attended = qry.unsqueeze(1).repeat(1, way, 1, 1, 1)
+        spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
+        qry_attended = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
+
+        spt_feats = torch.split(spt_attended,channels,dim=1)
+        qry_feats = torch.split(qry_attended,channels,dim=1)
+
+
+        corrs = []
+        spt_feats_proj = []
+        qry_feats_proj = []
+        for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
+            corr = self.corr(self.l2norm(src), self.l2norm(tgt))
+            
+            corrs.append(corr)
+            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
+            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2)))
+            
+
+        spt_feats = torch.stack(spt_feats_proj, dim=1)
+        qry_feats = torch.stack(qry_feats_proj, dim=1)
+        corr = torch.stack(corrs, dim=1)
+
+        corr = self.mutual_nn_filter(corr)
+        
+        refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
+
+        corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
+        corr_q = refined_corr.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size*self.feature_size)
+
+        # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
+        corr_s = self.gaussian_normalize(corr_s, dim=2)
+        corr_q = self.gaussian_normalize(corr_q, dim=4)
+
+        # applying softmax for each side
+        corr_s = F.softmax(corr_s / self.args.temperature_attn, dim=2)
+        corr_s = corr_s.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size,self.feature_size)
+        corr_q = F.softmax(corr_q / self.args.temperature_attn, dim=4)
+        corr_q = corr_q.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size,self.feature_size)
+
+        # suming up matching scores
+        attn_s = corr_s.sum(dim=[4, 5])
+        attn_q = corr_q.sum(dim=[2, 3])
+
+
+        # applying attention
+        spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)
+        qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)
+
+
+
 
         # averaging embeddings for k > 1 shots
         if self.args.shot > 1:
@@ -104,31 +194,6 @@ class Method(nn.Module):
         x = torch.div(x - x_mean, torch.sqrt(x_var + eps))
         return x
 
-    def get_4d_correlation_map(self, spt, qry):
-        '''
-        The value H and W both for support and query is the same, but their subscripts are symbolic.
-        :param spt: way * C * H_s * W_s
-        :param qry: num_qry * C * H_q * W_q
-        :return: 4d correlation tensor: num_qry * way * H_s * W_s * H_q * W_q
-        :rtype:
-        '''
-        way = spt.shape[0]
-        num_qry = qry.shape[0]
-
-        # reduce channel size via 1x1 conv
-        spt = self.cca_1x1(spt)
-        qry = self.cca_1x1(qry)
-
-        # normalize channels for later cosine similarity
-        spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
-        qry = F.normalize(qry, p=2, dim=1, eps=1e-8)
-
-        # num_way * C * H_p * W_p --> num_qry * way * H_p * W_p
-        # num_qry * C * H_q * W_q --> num_qry * way * H_q * W_q
-        spt = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1)
-        qry = qry.unsqueeze(1).repeat(1, way, 1, 1, 1)
-        similarity_map_einsum = torch.einsum('qncij,qnckl->qnijkl', spt, qry)
-        return similarity_map_einsum
 
     def normalize_feature(self, x):
         return x - x.mean(1).unsqueeze(1)
@@ -146,7 +211,5 @@ class Method(nn.Module):
                 x = F.relu(x, inplace=True)
             feats[idx] = x
         x = torch.cat(feats,dim=1)
-        if do_gap:
-            return F.adaptive_avg_pool2d(x, 1)
-        else:
-            return x
+        
+        return x

@@ -6,10 +6,10 @@ from functools import reduce, partial
 import torch.nn.functional as F
 
 class ResNet18(nn.Module):
-    def __init__(self,freeze=False):
+    def __init__(self,freeze=False, feature_size=16):
         super(ResNet18,self).__init__()
         self.backbone = models.resnet18(pretrained=True)
-        self.feature_size = 3
+        self.feature_size = feature_size
         if freeze:
             for param in self.backbone.parameters():
                 param.requires_grad = False
