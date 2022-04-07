@@ -251,7 +251,7 @@ class Method(nn.Module):
     def encode(self, x, do_gap=True):
         feats = self.encoder(x)
         
-        for idx,x in enumerate(feats):
+        for idx, x in enumerate(feats):
             if self.args.self_method:
                 identity = x
                 x = self.scr_module[idx](x)
