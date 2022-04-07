@@ -85,7 +85,7 @@ class Method(nn.Module):
 
         # averaging embeddings for k > 1 shots
         if self.args.shot > 1:
-            spt_attended = spt_attended.view(num_qry, self.args.shot, self.arg.way, *spt_attended.shape[2:])
+            spt_attended = spt_attended.view(num_qry, self.args.shot, self.args.way, *spt_attended.shape[2:])
             qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
             spt_attended = spt_attended.mean(dim=1)
             qry_attended = qry_attended.mean(dim=1)
