@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import numpy as np
 import timm
 from timm.models.layers import DropPath, trunc_normal_
-import torchvision.models as models
+# import torchvision.models as models
 
 from models.feature_backbones import resnet
 from models.mod import FeatureL2Norm, unnormalise_and_convert_mapping_to_flow
@@ -159,14 +159,14 @@ class FeatureExtractionHyperPixel(nn.Module):
     def __init__(self, hyperpixel_ids, feature_size, freeze=True):
         super().__init__()
         self.backbone = resnet.resnet101(pretrained=True)
-        self.feature_size = feature_size
+        self.feature_size = feature_size #16
         if freeze:
             for param in self.backbone.parameters():
                 param.requires_grad = False
         nbottlenecks = [3, 4, 23, 3]
-        self.bottleneck_ids = reduce(add, list(map(lambda x: list(range(x)), nbottlenecks)))
-        self.layer_ids = reduce(add, [[i + 1] * x for i, x in enumerate(nbottlenecks)])
-        self.hyperpixel_ids = hyperpixel_ids
+        self.bottleneck_ids = reduce(add, list(map(lambda x: list(range(x)), nbottlenecks)))# [0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,... 21, 22, 0, 1, 2]
+        self.layer_ids = reduce(add, [[i + 1] * x for i, x in enumerate(nbottlenecks)])# [1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,... 3, 3, 4, 4, 4]
+        self.hyperpixel_ids = hyperpixel_ids #[0,8,20,21,26,28,29,30]
     
     
     def forward(self, img):
@@ -315,3 +315,6 @@ class CATs(nn.Module):
         flow = unnormalise_and_convert_mapping_to_flow(flow)
 
         return flow
+
+
+

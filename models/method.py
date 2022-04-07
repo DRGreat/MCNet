@@ -21,15 +21,18 @@ class Method(nn.Module):
 
         # self.encoder = ResNet(args=args)
         self.encoder = ResNet18(freeze=False)
-        self.encoder_dim = 512
+        self.encoder_dim = 960
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
 
-        self.scr_module = self._make_scr_layer(planes=[512, 64, 64, 64, 512])
-        self.cca_1x1 = nn.Sequential(
-            nn.Conv2d(self.encoder_dim, 64, kernel_size=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU()
+        self.scr_module = nn.ModuleList(
+            [
+            self._make_scr_layer(planes=[64, 64, 64, 64, 64]),
+            self._make_scr_layer(planes=[128, 64, 64, 64, 128]),
+            self._make_scr_layer(planes=[256, 64, 64, 64, 256]),
+            self._make_scr_layer(planes=[512, 64, 64, 64, 512])
+            ]
         )
+       
 
     def _make_scr_layer(self, planes):
         stride, kernel_size, padding = (1, 1, 1), (3, 3), 1
@@ -38,15 +41,6 @@ class Method(nn.Module):
         if self.args.self_method == 'scr':
             corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
             self_block = SCR(planes=planes, stride=stride)
-        elif self.args.self_method == 'sce':
-            planes = [640, 64, 64, 640]
-            self_block = SpatialContextEncoder(planes=planes, kernel_size=kernel_size[0])
-        elif self.args.self_method == 'se':
-            self_block = SqueezeExcitation(channel=planes[0])
-        elif self.args.self_method == 'lsa':
-            self_block = LocalSelfAttention(in_channels=planes[0], out_channels=planes[0], kernel_size=kernel_size[0])
-        elif self.args.self_method == 'nlsa':
-            self_block = NonLocalSelfAttention(planes[0], sub_sample=False)
         else:
             raise NotImplementedError
 
@@ -140,16 +134,18 @@ class Method(nn.Module):
         return x - x.mean(1).unsqueeze(1)
 
     def encode(self, x, do_gap=True):
-        x = self.encoder(x)
+        feats = self.encoder(x)
+        
+        for idx,x in enumerate(feats):
+            if self.args.self_method:
+                identity = x
+                x = self.scr_module[idx](x)
 
-        if self.args.self_method:
-            identity = x
-            x = self.scr_module(x)
-
-            if self.args.self_method == 'scr':
-                x = x + identity
-            x = F.relu(x, inplace=True)
-
+                if self.args.self_method == 'scr':
+                    x = x + identity
+                x = F.relu(x, inplace=True)
+            feats[idx] = x
+        x = torch.cat(feats,dim=1)
         if do_gap:
             return F.adaptive_avg_pool2d(x, 1)
         else:
