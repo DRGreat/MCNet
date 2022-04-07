@@ -297,18 +297,21 @@ class CATs(nn.Module):
         tgt_feats_proj = []
         for i, (src, tgt) in enumerate(zip(src_feats, tgt_feats)):
             corr = self.corr(self.l2norm(src), self.l2norm(tgt))
+            
             corrs.append(corr)
             src_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
             tgt_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2)))
+            
 
         src_feats = torch.stack(src_feats_proj, dim=1)
         tgt_feats = torch.stack(tgt_feats_proj, dim=1)
         corr = torch.stack(corrs, dim=1)
-        
+
+
         corr = self.mutual_nn_filter(corr)
-
+        
         refined_corr = self.decoder(corr, src_feats, tgt_feats)
-
+        print("refine_corr",refined_corr.size())
         grid_x, grid_y = self.soft_argmax(refined_corr.view(B, -1, self.feature_size, self.feature_size))
 
         flow = torch.cat((grid_x, grid_y), dim=1)
