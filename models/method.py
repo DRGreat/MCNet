@@ -3,67 +3,130 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.resnet import ResNet
+from models.feature_backbones.resnet18 import ResNet18
 from models.cca import CCA
 from models.scr import SCR, SelfCorrelationComputation
 from models.others.se import SqueezeExcitation
 from models.others.lsa import LocalSelfAttention
 from models.others.nlsa import NonLocalSelfAttention
 from models.others.sce import SpatialContextEncoder
-from torchvision import transforms as T
-import numpy as np
-from models.resnet import conv3x3
-
-class AugmentedCNN(nn.Module):
-    def __init__(self):
-        super(AugmentedCNN, self).__init__()
-
-        self.conv = conv3x3(640*4,640*4)
-        self.bn = nn.BatchNorm2d(640*4)
-        self.relu = nn.LeakyReLU(0.1)
-
-    def forward(self,x):
-        residual = x
-
-        out = self.conv(x)
-        out = self.bn(out)
-        out = self.relu(out)
-        out = out * residual
-
-        return out
-
-
-
+from models.cats import TransformerAggregator
+from functools import reduce, partial
+from models.mod import FeatureL2Norm
 
 
 class Method(nn.Module):
 
-    def __init__(self, args, mode=None):
+    def __init__(self, 
+    args, 
+    mode=None,
+    feature_size=3,
+    feature_proj_dim=3,
+    depth=4,
+    num_heads=6,
+    mlp_ratio=4):
         super().__init__()
         self.mode = mode
         self.args = args
 
-        self.encoder = ResNet(args=args)
-        self.encoder_dim = 640
-        self.fc = nn.Linear(self.encoder_dim*4, self.args.num_class)
-        self.scr_module = self._make_scr_layer(planes=[640, 64, 64, 64, 640])
-        self.augmented_cnn = AugmentedCNN()
+        # self.encoder = ResNet(args=args)
+        self.encoder = ResNet18(freeze=False,feature_size=feature_size)
+        self.encoder_dim = 960
+        self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
+        self.cca_1x1 = nn.ModuleList([
+            nn.Sequential(
+            nn.Conv2d(64, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+            nn.Sequential(
+            nn.Conv2d(128, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+            nn.Sequential(
+            nn.Conv2d(256, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+            nn.Sequential(
+            nn.Conv2d(512, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+        ])
+        self.scr_module = nn.ModuleList(
+            [
+            self._make_scr_layer(planes=[64, 64, 64, 64, 64]),
+            self._make_scr_layer(planes=[128, 64, 64, 64, 128]),
+            self._make_scr_layer(planes=[256, 64, 64, 64, 256]),
+            self._make_scr_layer(planes=[512, 64, 64, 64, 512])
+            ]
+        )
+
+        self.feature_size = feature_size
+        self.feature_proj_dim = feature_proj_dim
+        self.decoder_embed_dim = self.feature_size ** 2 + self.feature_proj_dim
+        
+        channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
+        hyperpixel_ids = [2,4,6,8]
+        self.proj = nn.ModuleList([
+            nn.Linear(channels[i], self.feature_proj_dim) for i in hyperpixel_ids
+        ])
+
+        self.decoder = TransformerAggregator(
+            img_size=self.feature_size, embed_dim=self.decoder_embed_dim, depth=depth, num_heads=num_heads,
+            mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
+            num_hyperpixel=len(hyperpixel_ids))
+            
+        self.l2norm = FeatureL2Norm()
+
+
+    def corr(self, src, trg):
+        return src.flatten(2).transpose(-1, -2) @ trg.flatten(2)
+    
+    def get_4d_correlation_map(self, spt, qry,idx,num_qry,way):
+        '''
+        The value H and W both for support and query is the same, but their subscripts are symbolic.
+        :param spt: way * C * H_s * W_s
+        :param qry: num_qry * C * H_q * W_q
+        :return: 4d correlation tensor: num_qry * way * H_s * W_s * H_q * W_q
+        :rtype:
+        '''
+        # reduce channel size via 1x1 conv
+        spt = self.cca_1x1[idx](spt)
+        qry = self.cca_1x1[idx](qry)
+
+        # normalize channels for later cosine similarity
+        spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
+        qry = F.normalize(qry, p=2, dim=1, eps=1e-8)
+
+       
+        spt = spt.view(num_qry, way, *spt.size()[1:])
+        qry = qry.view(num_qry, way, *qry.size()[1:])
+        similarity_map_einsum = torch.einsum('qncij,qnckl->qnijkl', spt, qry)
+        _,_,h,w,_,_ = similarity_map_einsum.size()
+        similarity_map = similarity_map_einsum.view(-1, h*w,h*w)
+        
+        return similarity_map
+
+
+    def mutual_nn_filter(self, correlation_matrix):
+        r"""Mutual nearest neighbor filtering (Rocco et al. NeurIPS'18)"""
+        corr_src_max = torch.max(correlation_matrix, dim=3, keepdim=True)[0]
+        corr_trg_max = torch.max(correlation_matrix, dim=2, keepdim=True)[0]
+        corr_src_max[corr_src_max == 0] += 1e-30
+        corr_trg_max[corr_trg_max == 0] += 1e-30
+
+        corr_src = correlation_matrix / corr_src_max
+        corr_trg = correlation_matrix / corr_trg_max
+
+        return correlation_matrix * (corr_src * corr_trg)
+
 
     def _make_scr_layer(self, planes):
-        stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+        stride, kernel_size, padding = (1, 1, 1), (3, 3), 1
         layers = list()
 
         if self.args.self_method == 'scr':
             corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
             self_block = SCR(planes=planes, stride=stride)
-        elif self.args.self_method == 'sce':
-            planes = [640, 64, 64, 640]
-            self_block = SpatialContextEncoder(planes=planes, kernel_size=kernel_size[0])
-        elif self.args.self_method == 'se':
-            self_block = SqueezeExcitation(channel=planes[0])
-        elif self.args.self_method == 'lsa':
-            self_block = LocalSelfAttention(in_channels=planes[0], out_channels=planes[0], kernel_size=kernel_size[0])
-        elif self.args.self_method == 'nlsa':
-            self_block = NonLocalSelfAttention(planes[0], sub_sample=False)
         else:
             raise NotImplementedError
 
@@ -79,7 +142,7 @@ class Method(nn.Module):
             return self.encode(input, False)
         elif self.mode == 'cca':
             spt, qry = input
-            return self.smlrty(spt, qry)
+            return self.cca(spt, qry)
         else:
             raise ValueError('Unknown mode')
 
@@ -87,33 +150,97 @@ class Method(nn.Module):
         x = x.mean(dim=[-1, -2])
         return self.fc(x)
 
-    def smlrty(self, spt, qry):
-
-        num_qry, way, shot = self.args.query, self.args.way, self.args.shot
+    def cca(self, spt, qry):
         spt = spt.squeeze(0)
-        
 
         # shifting channel activations by the channel mean
-        spt = self.gaussian_normalize(spt,dim=1)
-        qry = self.gaussian_normalize(qry,dim=1)
+        spt = self.normalize_feature(spt)
+        qry = self.normalize_feature(qry)
+
         
-        spt_ = spt.mean(dim=[-1,-2]).contiguous().view(shot,way,-1).mean(dim=0)
-        qry_ = qry.mean(dim=[-1,-2])
-        spt_ext = spt_.unsqueeze(0).repeat(num_qry*way,1,1).contiguous().view(num_qry*way*way,-1)
-        qry_ext = qry_.unsqueeze(1).repeat(1,way,1).contiguous().view(num_qry*way*way,-1)
 
-        similarity_matrix = -F.pairwise_distance(spt_ext,qry_ext,p=2).contiguous().view(num_qry*way,way)
+        channels = [64,128,256,512]
+        
 
+        way = spt.shape[0]
+        num_qry = qry.shape[0]
+
+        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
+        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
+
+
+        spt_feats = torch.split(spt_feats,channels,dim=1)
+        qry_feats = torch.split(qry_feats,channels,dim=1)
+
+
+        corrs = []
+        spt_feats_proj = []
+        qry_feats_proj = []
+        for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
+            corr = self.get_4d_correlation_map(src, tgt, i, num_qry, way)
+            
+            corrs.append(corr)
+            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
+            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2)))
+            
+
+        spt_feats = torch.stack(spt_feats_proj, dim=1)
+        qry_feats = torch.stack(qry_feats_proj, dim=1)
+        corr = torch.stack(corrs, dim=1)
+
+        corr = self.mutual_nn_filter(corr)
+        
+        refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
+
+        corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
+        corr_q = refined_corr.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size*self.feature_size)
+
+        # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
+        corr_s = self.gaussian_normalize(corr_s, dim=2)
+        corr_q = self.gaussian_normalize(corr_q, dim=4)
+
+        # applying softmax for each side
+        corr_s = F.softmax(corr_s / self.args.temperature_attn, dim=2)
+        corr_s = corr_s.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size,self.feature_size)
+        corr_q = F.softmax(corr_q / self.args.temperature_attn, dim=4)
+        corr_q = corr_q.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size,self.feature_size)
+
+        # suming up matching scores
+        attn_s = corr_s.sum(dim=[4, 5])
+        attn_q = corr_q.sum(dim=[2, 3])
+
+
+        # applying attention
+        spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)
+        qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)
+
+
+
+
+        # averaging embeddings for k > 1 shots
+        if self.args.shot > 1:
+            spt_attended = spt_attended.view(num_qry, self.args.shot, self.args.way, *spt_attended.shape[2:])
+            qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
+            spt_attended = spt_attended.mean(dim=1)
+            qry_attended = qry_attended.mean(dim=1)
+
+        # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
+        # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
+        spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
+        qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
+        qry_pooled = qry.mean(dim=[-1, -2])
+
+        similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)
+        # similarity_matrix = -F.pairwise_distance(spt_attended_pooled.view(num_qry*self.args.way,-1), qry_attended_pooled.view(num_qry*self.args.way,-1), p=2).view(num_qry,self.args.way)
 
         if self.training:
-            return similarity_matrix , self.fc(qry_)
+            return similarity_matrix / self.args.temperature, self.fc(qry_pooled)
         else:
-            return similarity_matrix
+            return similarity_matrix / self.args.temperature
 
     def gaussian_normalize(self, x, dim, eps=1e-05):
         x_mean = torch.mean(x, dim=dim, keepdim=True)
         x_var = torch.var(x, dim=dim, keepdim=True)
-
         x = torch.div(x - x_mean, torch.sqrt(x_var + eps))
         return x
 
@@ -122,53 +249,17 @@ class Method(nn.Module):
         return x - x.mean(1).unsqueeze(1)
 
     def encode(self, x, do_gap=True):
-        # creating augmented data by applying three kinds of transfrom
-        hflipper = T.RandomHorizontalFlip(p=1) #水平翻转
-        vflipper = T.RandomVerticalFlip(p=1) #上下翻转
-        rotater = T.RandomRotation([-90,-90]) #顺时针90度翻转
+        feats = self.encoder(x)
+        
+        for idx, x in enumerate(feats):
+            if self.args.self_method:
+                identity = x
+                x = self.scr_module[idx](x)
 
-        x_h = torch.stack([hflipper(x[i]) for i in range(len(x))])
-        x_v = torch.stack([vflipper(x[i]) for i in range(len(x))])
-        x_r = torch.stack([rotater(x[i]) for i in range(len(x))])
-
-
-       
-
-        x = self.encoder(x)
-        x_h = self.encoder(x_h)
-        x_v = self.encoder(x_v)
-        x_r = self.encoder(x_r)
-
-        if self.args.self_method:
-            identity = x
-            identity_h = x_h
-            identity_v = x_v
-            identity_r = x_r
-
-            x = self.scr_module(x)
-            x_h = self.scr_module(x_h)
-            x_v = self.scr_module(x_v)
-            x_r = self.scr_module(x_r)
-
-            if self.args.self_method == 'scr':
-                x = x + identity
-                x_h = x_h + identity_h
-                x_v = x_v + identity_v
-                x_r = x_r + identity_r #[100,640,5,5]
-            x = F.relu(x, inplace=True)
-            x_h = F.relu(x_h, inplace=True)
-            x_v = F.relu(x_v, inplace=True)
-            x_r = F.relu(x_r, inplace=True)
-
-            x = torch.cat([x,x_h,x_v,x_r],dim=1) #[100,640*4,5,5]
-
-            #再过一下卷积层
-
-
-            x = self.augmented_cnn(x)
-
-            # import sys
-            # sys.exit(0)
-
-
-            return x
+                if self.args.self_method == 'scr':
+                    x = x + identity
+                x = F.relu(x, inplace=True)
+            feats[idx] = x
+        x = torch.cat(feats,dim=1)
+        
+        return x

@@ -11,15 +11,15 @@ class SCR(nn.Module):
 
         self.conv1x1_in = nn.Sequential(nn.Conv2d(planes[0], planes[1], kernel_size=1, bias=False, padding=0),
                                         nn.BatchNorm2d(planes[1]),
-                                        nn.ReLU(inplace=True))
+                                        nn.ReLU())
         self.conv1 = nn.Sequential(nn.Conv3d(planes[1], planes[2], (1, self.ksize[2], self.ksize[3]),
-                                             stride=stride, bias=bias, padding=padding1),
+                                             stride=stride, bias=bias, padding=(0,1,1)),
                                    nn.BatchNorm3d(planes[2]),
-                                   nn.ReLU(inplace=True))
+                                   nn.ReLU())
         self.conv2 = nn.Sequential(nn.Conv3d(planes[2], planes[3], (1, self.ksize[2], self.ksize[3]),
                                              stride=stride, bias=bias, padding=padding1),
                                    nn.BatchNorm3d(planes[3]),
-                                   nn.ReLU(inplace=True))
+                                   nn.ReLU())
         self.conv1x1_out = nn.Sequential(
             nn.Conv2d(planes[3], planes[4], kernel_size=1, bias=False, padding=0),
             nn.BatchNorm2d(planes[4]))
@@ -46,7 +46,7 @@ class SelfCorrelationComputation(nn.Module):
         super(SelfCorrelationComputation, self).__init__()
         self.kernel_size = kernel_size
         self.unfold = nn.Unfold(kernel_size=kernel_size, padding=padding)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         b, c, h, w = x.shape
