@@ -155,6 +155,10 @@ class Method(nn.Module):
                 x_h = x_h + identity_h
                 x_v = x_v + identity_v
                 x_r = x_r + identity_r #[100,640,5,5]
+            x = F.relu(x, inplace=True)
+            x_h = F.relu(x_h, inplace=True)
+            x_v = F.relu(x_v, inplace=True)
+            x_r = F.relu(x_r, inplace=True)
 
             x = torch.cat([x,x_h,x_v,x_r],dim=1) #[100,640*4,5,5]
 
