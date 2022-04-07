@@ -29,47 +29,39 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        # self.encoder = ResNet(args=args)
+        # self.encoder = ResNet(args=args,feature_size=feature_size)
+        # self.encoder_dim = 1184
+        # channels =  [64] * 3 + [160] * 3 + [320] * 3 + [640] * 3
+        # hyperpixel_ids = [2,5,8,11]
+
         self.encoder = ResNet18(freeze=False,feature_size=feature_size)
         self.encoder_dim = 960
+        channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
+        hyperpixel_ids = [2,4,6,8]
+
+
+        self.channels = channels
+        self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
-        self.cca_1x1 = nn.ModuleList([
-            nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU()),
-            nn.Sequential(
-            nn.Conv2d(128, 64, kernel_size=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU()),
-            nn.Sequential(
-            nn.Conv2d(256, 64, kernel_size=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU()),
-            nn.Sequential(
-            nn.Conv2d(512, 64, kernel_size=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU()),
-        ])
-        self.scr_module = nn.ModuleList(
-            [
-            self._make_scr_layer(planes=[64, 64, 64, 64, 64]),
-            self._make_scr_layer(planes=[128, 64, 64, 64, 128]),
-            self._make_scr_layer(planes=[256, 64, 64, 64, 256]),
-            self._make_scr_layer(planes=[512, 64, 64, 64, 512])
-            ]
-        )
+     
 
         self.feature_size = feature_size
         self.feature_proj_dim = feature_proj_dim
         self.decoder_embed_dim = self.feature_size ** 2 + self.feature_proj_dim
         
-        channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
-        hyperpixel_ids = [2,4,6,8]
+        
         self.proj = nn.ModuleList([
             nn.Linear(channels[i], self.feature_proj_dim) for i in hyperpixel_ids
         ])
-
+        self.cca_1x1 = nn.ModuleList([
+            nn.Sequential(
+            nn.Conv2d(channels[i], 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()) for i in hyperpixel_ids
+        ])
+        self.scr_module = nn.ModuleList([
+            self._make_scr_layer(planes=[channels[i], 64, 64, 64, channels[i]]) for i in hyperpixel_ids
+            ])
         self.decoder = TransformerAggregator(
             img_size=self.feature_size, embed_dim=self.decoder_embed_dim, depth=depth, num_heads=num_heads,
             mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -156,23 +148,15 @@ class Method(nn.Module):
         # shifting channel activations by the channel mean
         spt = self.normalize_feature(spt)
         qry = self.normalize_feature(qry)
-
         
 
-        channels = [64,128,256,512]
-        
-
+        channels = [self.channels[i] for i in self.hyperpixel_ids]
         way = spt.shape[0]
         num_qry = qry.shape[0]
-
         spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
-
-
         spt_feats = torch.split(spt_feats,channels,dim=1)
         qry_feats = torch.split(qry_feats,channels,dim=1)
-
-
         corrs = []
         spt_feats_proj = []
         qry_feats_proj = []
@@ -183,18 +167,13 @@ class Method(nn.Module):
             spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
             qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2)))
             
-
         spt_feats = torch.stack(spt_feats_proj, dim=1)
         qry_feats = torch.stack(qry_feats_proj, dim=1)
         corr = torch.stack(corrs, dim=1)
-
         corr = self.mutual_nn_filter(corr)
-        
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
-
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
         corr_q = refined_corr.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size*self.feature_size)
-
         # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
         corr_s = self.gaussian_normalize(corr_s, dim=2)
         corr_q = self.gaussian_normalize(corr_q, dim=4)
@@ -209,13 +188,12 @@ class Method(nn.Module):
         attn_s = corr_s.sum(dim=[4, 5])
         attn_q = corr_q.sum(dim=[2, 3])
 
-
         # applying attention
         spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)
         qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)
 
-
-
+        # spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1)
+        # qry_attended = qry.unsqueeze(1).repeat(1, way, 1, 1, 1)
 
         # averaging embeddings for k > 1 shots
         if self.args.shot > 1:
@@ -263,5 +241,3 @@ class Method(nn.Module):
         x = torch.cat(feats,dim=1)
         
         return x
-
-#really
