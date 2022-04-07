@@ -33,7 +33,24 @@ class Method(nn.Module):
         self.encoder = ResNet18(freeze=False,feature_size=feature_size)
         self.encoder_dim = 960
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
-
+        self.cca_1x1 = nn.ModuleList([
+            nn.Sequential(
+            nn.Conv2d(64, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+            nn.Sequential(
+            nn.Conv2d(128, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+            nn.Sequential(
+            nn.Conv2d(256, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+            nn.Sequential(
+            nn.Conv2d(512, 64, kernel_size=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()),
+        ])
         self.scr_module = nn.ModuleList(
             [
             self._make_scr_layer(planes=[64, 64, 64, 64, 64]),
@@ -63,6 +80,32 @@ class Method(nn.Module):
 
     def corr(self, src, trg):
         return src.flatten(2).transpose(-1, -2) @ trg.flatten(2)
+    
+    def get_4d_correlation_map(self, spt, qry,idx,num_qry,way):
+        '''
+        The value H and W both for support and query is the same, but their subscripts are symbolic.
+        :param spt: way * C * H_s * W_s
+        :param qry: num_qry * C * H_q * W_q
+        :return: 4d correlation tensor: num_qry * way * H_s * W_s * H_q * W_q
+        :rtype:
+        '''
+        # reduce channel size via 1x1 conv
+        spt = self.cca_1x1[idx](spt)
+        qry = self.cca_1x1[idx](qry)
+
+        # normalize channels for later cosine similarity
+        spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
+        qry = F.normalize(qry, p=2, dim=1, eps=1e-8)
+
+       
+        spt = spt.view(num_qry, way, *spt.size()[1:])
+        qry = qry.view(num_qry, way, *qry.size()[1:])
+        similarity_map_einsum = torch.einsum('qncij,qnckl->qnijkl', spt, qry)
+        _,_,h,w,_,_ = similarity_map_einsum.size()
+        similarity_map = similarity_map_einsum.view(-1, h*w,h*w)
+        
+        return similarity_map
+
 
     def mutual_nn_filter(self, correlation_matrix):
         r"""Mutual nearest neighbor filtering (Rocco et al. NeurIPS'18)"""
@@ -110,24 +153,31 @@ class Method(nn.Module):
     def cca(self, spt, qry):
         spt = spt.squeeze(0)
 
+        # shifting channel activations by the channel mean
+        spt = self.normalize_feature(spt)
+        qry = self.normalize_feature(qry)
+
+        
+
         channels = [64,128,256,512]
         
 
         way = spt.shape[0]
         num_qry = qry.shape[0]
 
-        spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
-        qry_attended = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
+        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
+        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
 
-        spt_feats = torch.split(spt_attended,channels,dim=1)
-        qry_feats = torch.split(qry_attended,channels,dim=1)
+
+        spt_feats = torch.split(spt_feats,channels,dim=1)
+        qry_feats = torch.split(qry_feats,channels,dim=1)
 
 
         corrs = []
         spt_feats_proj = []
         qry_feats_proj = []
         for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
-            corr = self.corr(self.l2norm(src), self.l2norm(tgt))
+            corr = self.get_4d_correlation_map(src, tgt, i, num_qry, way)
             
             corrs.append(corr)
             spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
