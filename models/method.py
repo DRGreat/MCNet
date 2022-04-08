@@ -18,7 +18,7 @@ from models.mod import FeatureL2Norm
 class Method(nn.Module):
 
     def __init__(self, 
-    args, 
+    args,  
     mode=None,
     feature_size=3,
     feature_proj_dim=3,
