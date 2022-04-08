@@ -145,7 +145,6 @@ class TransformerAggregator(nn.Module):
         
         pos_embed = torch.cat((self.pos_embed_x.repeat(1, 1, self.img_size, 1, 1), self.pos_embed_y.repeat(1, 1, 1, self.img_size, 1)), dim=4)
         pos_embed = pos_embed.flatten(2, 3)
-
         x = torch.cat((x.transpose(-1, -2), target), dim=3) + pos_embed
         x = self.proj(self.blocks(x)).transpose(-1, -2) + corr  # swapping the axis for swapping self-attention.
 

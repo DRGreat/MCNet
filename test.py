@@ -70,8 +70,8 @@ if __name__ == '__main__':
     args = setup_run(arg_mode='test')
 
     ''' define model '''
-    # model = Method(args).cuda()
-    model = RENet(args).cuda()
+    model = Method(args).cuda()
+    # model = RENet(args).cuda()
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
     test_main(model, args)
