@@ -118,7 +118,7 @@ def train_main(args):
         train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
         val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
 
-        with open(f"{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
             f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
 
@@ -148,9 +148,7 @@ if __name__ == '__main__':
     args = setup_run(arg_mode='train')
 
     model = train_main(args)
-    test_acc, test_ci = test_main(model, args)
-    with open(f"{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
-            f.write(f'[final] epo:best | avg.acc:{test_acc:.3f}\n\n')
+    test_acc, test_ci = test_main(model, args,logid)
 
     if not args.no_wandb:
         wandb.log({'test/acc': test_acc, 'test/confidence_interval': test_ci})

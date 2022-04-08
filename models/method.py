@@ -18,7 +18,7 @@ from models.mod import FeatureL2Norm
 class Method(nn.Module):
 
     def __init__(self, 
-    args, 
+    args,  
     mode=None,
     feature_size=3,
     feature_proj_dim=3,
@@ -148,11 +148,12 @@ class Method(nn.Module):
         # shifting channel activations by the channel mean
         spt = self.normalize_feature(spt)
         qry = self.normalize_feature(qry)
-        
-
-        channels = [self.channels[i] for i in self.hyperpixel_ids]
         way = spt.shape[0]
         num_qry = qry.shape[0]
+
+#----------------------------------cat--------------------------------------#
+        channels = [self.channels[i] for i in self.hyperpixel_ids]
+        
         spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
         spt_feats = torch.split(spt_feats,channels,dim=1)
@@ -162,6 +163,7 @@ class Method(nn.Module):
         qry_feats_proj = []
         for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
             corr = self.get_4d_correlation_map(src, tgt, i, num_qry, way)
+            # corr = self.corr(self.l2norm(src), self.l2norm(tgt))
             
             corrs.append(corr)
             spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
@@ -192,8 +194,14 @@ class Method(nn.Module):
         spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)
         qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)
 
+#----------------------------------cat--------------------------------------#
+
+
         # spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1)
         # qry_attended = qry.unsqueeze(1).repeat(1, way, 1, 1, 1)
+
+#----------------------------------replace--------------------------------------#
+
 
         # averaging embeddings for k > 1 shots
         if self.args.shot > 1:
