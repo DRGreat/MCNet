@@ -9,20 +9,21 @@ from models.others.se import SqueezeExcitation
 from models.others.lsa import LocalSelfAttention
 from models.others.nlsa import NonLocalSelfAttention
 from models.others.sce import SpatialContextEncoder
+from models.feature_backbones.resnet18 import ResNet18
 
 
 class RENet(nn.Module):
 
-    def __init__(self, args, mode=None):
+    def __init__(self, args, mode=None, feature_size=5):
         super().__init__()
         self.mode = mode
         self.args = args
 
-        self.encoder = ResNet(args=args)
-        self.encoder_dim = 640
+        self.encoder = ResNet18(freeze=False,feature_size=feature_size)
+        self.encoder_dim = 512
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
 
-        self.scr_module = self._make_scr_layer(planes=[640, 64, 64, 64, 640])
+        self.scr_module = self._make_scr_layer(planes=[512, 64, 64, 64, 512])
         self.cca_module = CCA(kernel_sizes=[3, 3], planes=[16, 1])
         self.cca_1x1 = nn.Sequential(
             nn.Conv2d(self.encoder_dim, 64, kernel_size=1, bias=False),
@@ -159,7 +160,7 @@ class RENet(nn.Module):
         return x - x.mean(1).unsqueeze(1)
 
     def encode(self, x, do_gap=True):
-        x = self.encoder(x)
+        x = self.encoder(x)[-1]
 
         if self.args.self_method:
             identity = x

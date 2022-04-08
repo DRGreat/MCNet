@@ -44,7 +44,7 @@ def evaluate(epoch, model, loader, args=None, set='val'):
     return loss_meter.avg(), acc_meter.avg(), acc_meter.confidence_interval()
 
 
-def test_main(model, args):
+def test_main(model, args, logid):
 
     ''' load model '''
     model = load_model(model, os.path.join(args.save_path, 'max_acc.pth'))
@@ -58,6 +58,9 @@ def test_main(model, args):
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
     print(f'[final] epo:{"best":>3} | {by(test_acc)} +- {test_ci:.3f}')
+    with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        f.write(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
+
     
 
     return test_acc, test_ci
@@ -67,7 +70,8 @@ if __name__ == '__main__':
     args = setup_run(arg_mode='test')
 
     ''' define model '''
-    model = Method(args).cuda()
+    # model = Method(args).cuda()
+    model = RENet(args).cuda()
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
     test_main(model, args)

@@ -13,7 +13,7 @@ class SCR(nn.Module):
                                         nn.BatchNorm2d(planes[1]),
                                         nn.ReLU())
         self.conv1 = nn.Sequential(nn.Conv3d(planes[1], planes[2], (1, self.ksize[2], self.ksize[3]),
-                                             stride=stride, bias=bias, padding=(0,1,1)),
+                                             stride=stride, bias=bias, padding=padding1),
                                    nn.BatchNorm3d(planes[2]),
                                    nn.ReLU())
         self.conv2 = nn.Sequential(nn.Conv3d(planes[2], planes[3], (1, self.ksize[2], self.ksize[3]),
