@@ -1,0 +1,61 @@
+[train] epo:  1 | avg.loss:9.5225 | avg.acc:67.739
+[val] epo:  1 | avg.loss:0.5187 | avg.acc:86.507
+
+[train] epo:  2 | avg.loss:6.8456 | avg.acc:78.174
+[val] epo:  2 | avg.loss:0.4528 | avg.acc:89.453
+
+[train] epo:  3 | avg.loss:5.8345 | avg.acc:82.942
+[val] epo:  3 | avg.loss:0.4315 | avg.acc:91.027
+
+[train] epo:  4 | avg.loss:5.3679 | avg.acc:83.884
+[val] epo:  4 | avg.loss:0.4274 | avg.acc:91.553
+
+[train] epo:  5 | avg.loss:4.8182 | avg.acc:88.087
+[val] epo:  5 | avg.loss:0.4163 | avg.acc:91.827
+
+[train] epo:  6 | avg.loss:4.6405 | avg.acc:87.029
+[val] epo:  6 | avg.loss:0.4157 | avg.acc:91.807
+
+[train] epo:  7 | avg.loss:4.3098 | avg.acc:88.971
+[val] epo:  7 | avg.loss:0.4173 | avg.acc:92.073
+
+[train] epo:  8 | avg.loss:4.1684 | avg.acc:88.116
+[val] epo:  8 | avg.loss:0.4036 | avg.acc:92.613
+
+[train] epo:  9 | avg.loss:3.9475 | avg.acc:90.478
+[val] epo:  9 | avg.loss:0.4066 | avg.acc:92.860
+
+[train] epo: 10 | avg.loss:3.7843 | avg.acc:89.986
+[val] epo: 10 | avg.loss:0.4034 | avg.acc:93.067
+
+[train] epo: 11 | avg.loss:3.6726 | avg.acc:91.130
+[val] epo: 11 | avg.loss:0.4011 | avg.acc:93.193
+
+[train] epo: 12 | avg.loss:3.5608 | avg.acc:90.986
+[val] epo: 12 | avg.loss:0.3936 | avg.acc:93.507
+
+[train] epo: 13 | avg.loss:3.4810 | avg.acc:91.058
+[val] epo: 13 | avg.loss:0.3973 | avg.acc:93.400
+
+[train] epo: 14 | avg.loss:3.4341 | avg.acc:91.522
+[val] epo: 14 | avg.loss:0.3961 | avg.acc:93.460
+
+[train] epo: 15 | avg.loss:3.4257 | avg.acc:91.623
+[val] epo: 15 | avg.loss:0.3977 | avg.acc:93.440
+
+[train] epo: 16 | avg.loss:3.3192 | avg.acc:92.768
+[val] epo: 16 | avg.loss:0.3898 | avg.acc:93.627
+
+[train] epo: 17 | avg.loss:3.4385 | avg.acc:91.420
+[val] epo: 17 | avg.loss:0.3991 | avg.acc:93.467
+
+[train] epo: 18 | avg.loss:3.4448 | avg.acc:91.043
+[val] epo: 18 | avg.loss:0.3970 | avg.acc:93.407
+
+[train] epo: 19 | avg.loss:3.4747 | avg.acc:90.768
+[val] epo: 19 | avg.loss:0.3974 | avg.acc:93.487
+
+[train] epo: 20 | avg.loss:3.4351 | avg.acc:91.841
+[val] epo: 20 | avg.loss:0.3974 | avg.acc:93.367
+
+[final] epo:best | 91.16667175292969 +- 0.249
