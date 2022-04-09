@@ -237,15 +237,15 @@ class Method(nn.Module):
     def encode(self, x, do_gap=True):
         feats = self.encoder(x)
         
-        for idx, x in enumerate(feats):
-            if self.args.self_method:
-                identity = x
-                x = self.scr_module[idx](x)
+        # for idx, x in enumerate(feats):
+        #     if self.args.self_method:
+        #         identity = x
+        #         x = self.scr_module[idx](x)
 
-                if self.args.self_method == 'scr':
-                    x = x + identity
-                x = F.relu(x, inplace=True)
-            feats[idx] = x
+        #         if self.args.self_method == 'scr':
+        #             x = x + identity
+        #         x = F.relu(x, inplace=True)
+        #     feats[idx] = x
         x = torch.cat(feats,dim=1)
         
         return x

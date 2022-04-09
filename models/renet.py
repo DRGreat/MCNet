@@ -14,7 +14,7 @@ from models.feature_backbones.resnet18 import ResNet18
 
 class RENet(nn.Module):
 
-    def __init__(self, args, mode=None, feature_size=5):
+    def __init__(self, args, mode=None, feature_size=3):
         super().__init__()
         self.mode = mode
         self.args = args
@@ -32,7 +32,7 @@ class RENet(nn.Module):
         )
 
     def _make_scr_layer(self, planes):
-        stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+        stride, kernel_size, padding = (1, 1, 1), (3, 3), 1
         layers = list()
 
         if self.args.self_method == 'scr':
