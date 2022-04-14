@@ -38,7 +38,7 @@ class Mlp(nn.Module):
         return x
         
 class Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(self, dim=12, num_heads=6, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
@@ -51,23 +51,23 @@ class Attention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x):
-        B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[2]   # make torchscript happy (cannot use tensor as tuple)
+        B, N, C = x.shape #[75x25x4,9,12]
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4) #[75x25x4,9,3,6,2] -> [3,75x25x4,6,9,2]
+        q, k, v = qkv[0], qkv[1], qkv[2]  # [75x25x4,6,9,2] # make torchscript happy (cannot use tensor as tuple)
 
-        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = (q @ k.transpose(-2, -1)) * self.scale # [75x25x4,6,9,9]
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
 
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-        x = self.proj(x)
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C) # [75x25x4,9,12]
+        x = self.proj(x) # [75x25x4,9,12]
         x = self.proj_drop(x)
         return x
 
 
 class MultiscaleBlock(nn.Module):
 
-    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+    def __init__(self, dim=12, num_heads =6, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
         super().__init__()
         self.attn = Attention(
@@ -88,33 +88,33 @@ class MultiscaleBlock(nn.Module):
         '''
         Multi-level aggregation
         '''
-        B, N, H, W = x.shape
+        B, N, H, W = x.shape #[75x25,4,9,12]
         if N == 1:
             x = x.flatten(0, 1)
             x = x + self.drop_path(self.attn(self.norm1(x)))
             x = x + self.drop_path(self.mlp(self.norm2(x)))
             return x.view(B, N, H, W)
-        x = x.flatten(0, 1)
+        x = x.flatten(0, 1) #[75x25x4,9,12]
         x = x + self.drop_path(self.attn(self.norm1(x)))
         x = x + self.drop_path(self.mlp2(self.norm4(x)))
-        x = x.view(B, N, H, W).transpose(1, 2).flatten(0, 1) 
+        x = x.view(B, N, H, W).transpose(1, 2).flatten(0, 1) #[75x25x9,4,12]
         x = x + self.drop_path(self.attn_multiscale(self.norm3(x)))
-        x = x.view(B, H, N, W).transpose(1, 2).flatten(0, 1)
+        x = x.view(B, H, N, W).transpose(1, 2).flatten(0, 1) #[75x25x4,9,12]
         x = x + self.drop_path(self.mlp(self.norm2(x)))
-        x = x.view(B, N, H, W)
+        x = x.view(B, N, H, W) #[75x25,4,9,12]
         return x
 
 
 class TransformerAggregator(nn.Module):
-    def __init__(self, num_hyperpixel, img_size=224, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4., qkv_bias=True, qk_scale=None,
+    def __init__(self, num_hyperpixel, img_size=3, embed_dim=12, depth=1, num_heads=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0., norm_layer=None):
         super().__init__()
         self.img_size = img_size
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
 
-        self.pos_embed_x = nn.Parameter(torch.zeros(1, num_hyperpixel, 1, img_size, embed_dim // 2))
-        self.pos_embed_y = nn.Parameter(torch.zeros(1, num_hyperpixel, img_size, 1, embed_dim // 2))
+        self.pos_embed_x = nn.Parameter(torch.zeros(1, num_hyperpixel, 1, img_size, embed_dim // 2)) #[1,4,1,3,6]
+        self.pos_embed_y = nn.Parameter(torch.zeros(1, num_hyperpixel, img_size, 1, embed_dim // 2)) #[1,4,3,1,6]
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
@@ -140,16 +140,18 @@ class TransformerAggregator(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def forward(self, corr, source, target):
+        # source target [75x25,4,9,3]
         B = corr.shape[0]
-        x = corr.clone()
-        
+        x = corr.clone() # [75x25,4,9,9]
+        # pos_embed_x [1,4,1,3,6]
+        # pos_embed_y [1,4,3,1,6]
         pos_embed = torch.cat((self.pos_embed_x.repeat(1, 1, self.img_size, 1, 1), self.pos_embed_y.repeat(1, 1, 1, self.img_size, 1)), dim=4)
-        pos_embed = pos_embed.flatten(2, 3)
-        x = torch.cat((x.transpose(-1, -2), target), dim=3) + pos_embed
+        pos_embed = pos_embed.flatten(2, 3) # [1,1,9,12]
+        x = torch.cat((x.transpose(-1, -2), target), dim=3) + pos_embed #[75x25,4,9,12]
         x = self.proj(self.blocks(x)).transpose(-1, -2) + corr  # swapping the axis for swapping self-attention.
 
         x = torch.cat((x, source), dim=3) + pos_embed
-        x = self.proj(self.blocks(x)) + corr 
+        x = self.proj(self.blocks(x)) + corr
 
         return x.mean(1)
 

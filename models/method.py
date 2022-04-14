@@ -34,11 +34,10 @@ class Method(nn.Module):
         # channels =  [64] * 3 + [160] * 3 + [320] * 3 + [640] * 3
         # hyperpixel_ids = [2,5,8,11]
 
-        self.encoder = ResNet18(freeze=False,feature_size=feature_size)
-        self.encoder_dim = 960
         channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
         hyperpixel_ids = [2,4,6,8]
-
+        self.encoder = ResNet18(freeze=False,feature_size=feature_size,hyperpixel_ids=hyperpixel_ids)
+        self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])
 
         self.channels = channels
         self.hyperpixel_ids = hyperpixel_ids
@@ -73,17 +72,11 @@ class Method(nn.Module):
     def corr(self, src, trg):
         return src.flatten(2).transpose(-1, -2) @ trg.flatten(2)
     
-    def get_4d_correlation_map(self, spt, qry,idx,num_qry,way):
-        '''
-        The value H and W both for support and query is the same, but their subscripts are symbolic.
-        :param spt: way * C * H_s * W_s
-        :param qry: num_qry * C * H_q * W_q
-        :return: 4d correlation tensor: num_qry * way * H_s * W_s * H_q * W_q
-        :rtype:
-        '''
+    def get_correlation_map(self, spt, qry,idx,num_qry,way):
+     
         # reduce channel size via 1x1 conv
         spt = self.cca_1x1[idx](spt)
-        qry = self.cca_1x1[idx](qry)
+        qry = self.cca_1x1[idx](qry) # [75x25,64,3,3]
 
         # normalize channels for later cosine similarity
         spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
@@ -153,26 +146,25 @@ class Method(nn.Module):
 
 #----------------------------------cat--------------------------------------#
         channels = [self.channels[i] for i in self.hyperpixel_ids]
-        
-        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:])
-        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:])
+        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:]) #[75x25,960,3,3]
+        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:]) #[75x25,960,3,3]
         spt_feats = torch.split(spt_feats,channels,dim=1)
         qry_feats = torch.split(qry_feats,channels,dim=1)
         corrs = []
         spt_feats_proj = []
         qry_feats_proj = []
         for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
-            corr = self.get_4d_correlation_map(src, tgt, i, num_qry, way)
+            corr = self.get_correlation_map(src, tgt, i, num_qry, way) #[75x25,9,9]
             # corr = self.corr(self.l2norm(src), self.l2norm(tgt))
             
             corrs.append(corr)
-            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2)))
-            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2)))
+            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,9,3]
+            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2))) #[75x25,9,3]
             
-        spt_feats = torch.stack(spt_feats_proj, dim=1)
+        spt_feats = torch.stack(spt_feats_proj, dim=1) 
         qry_feats = torch.stack(qry_feats_proj, dim=1)
-        corr = torch.stack(corrs, dim=1)
-        corr = self.mutual_nn_filter(corr)
+        corr = torch.stack(corrs, dim=1) #[75x25,4,9,9]
+        # corr = self.mutual_nn_filter(corr)
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
         corr_q = refined_corr.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size*self.feature_size)

@@ -6,7 +6,7 @@ from functools import reduce, partial
 import torch.nn.functional as F
 
 class ResNet18(nn.Module):
-    def __init__(self,freeze=False, feature_size=16):
+    def __init__(self,freeze=False, feature_size=16, hyperpixel_ids = [2,4,6,8]):
         super(ResNet18,self).__init__()
         self.backbone = models.resnet18(pretrained=True)
         self.feature_size = feature_size
@@ -17,7 +17,7 @@ class ResNet18(nn.Module):
         nbottlenecks = [2, 2, 2, 2]
         self.bottleneck_ids = reduce(add, list(map(lambda x: list(range(x)), nbottlenecks)))
         self.layer_ids = reduce(add, [[i + 1] * x for i, x in enumerate(nbottlenecks)])
-        self.hyperpixel_ids = [2,4,6,8]
+        self.hyperpixel_ids = hyperpixel_ids
 
 
     def forward(self,img):
