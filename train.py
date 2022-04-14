@@ -99,12 +99,15 @@ def train_main(args):
     # model = RENet(args).cuda()
     # model = ProtoNet(args).cuda()
     model = Method(args).cuda()
-
+    with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
     if not args.no_wandb:
         wandb.watch(model)
     print(model)
+    
+
 
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)

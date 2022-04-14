@@ -35,7 +35,9 @@ class Method(nn.Module):
         # hyperpixel_ids = [2,5,8,11]
 
         channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
-        hyperpixel_ids = [2,4,6,8]
+        # hyperpixel_ids = [2,4,6,8]
+        hyperpixel_ids = [6,7,8]
+
         self.encoder = ResNet18(freeze=False,feature_size=feature_size,hyperpixel_ids=hyperpixel_ids)
         self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])
 
