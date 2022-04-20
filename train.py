@@ -100,6 +100,7 @@ def train_main(args):
     # model = ProtoNet(args).cuda()
     model = Method(args).cuda()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        # f.write(f"{model.__class__.__name__}\n")
         f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
 

@@ -1,0 +1,32 @@
+Method|[7, 8]
+[train] epo:  1 | avg.loss:5.3119 | avg.acc:60.102
+[val] epo:  1 | avg.loss:1.0642 | avg.acc:68.287
+
+[train] epo:  2 | avg.loss:3.9674 | avg.acc:69.409
+[val] epo:  2 | avg.loss:1.0522 | avg.acc:68.920
+
+[train] epo:  3 | avg.loss:3.6264 | avg.acc:71.033
+[val] epo:  3 | avg.loss:1.0577 | avg.acc:68.513
+
+[train] epo:  4 | avg.loss:3.4044 | avg.acc:72.322
+[val] epo:  4 | avg.loss:1.0622 | avg.acc:67.307
+
+[train] epo:  5 | avg.loss:3.0978 | avg.acc:75.069
+[val] epo:  5 | avg.loss:1.0353 | avg.acc:69.567
+
+[train] epo:  6 | avg.loss:3.0123 | avg.acc:75.171
+[val] epo:  6 | avg.loss:1.0363 | avg.acc:69.520
+
+[train] epo:  7 | avg.loss:2.9751 | avg.acc:75.758
+[val] epo:  7 | avg.loss:1.0333 | avg.acc:69.540
+
+[train] epo:  8 | avg.loss:3.0022 | avg.acc:74.611
+[val] epo:  8 | avg.loss:1.0353 | avg.acc:69.467
+
+[train] epo:  9 | avg.loss:2.9716 | avg.acc:75.860
+[val] epo:  9 | avg.loss:1.0372 | avg.acc:69.440
+
+[train] epo: 10 | avg.loss:2.9737 | avg.acc:75.362
+[val] epo: 10 | avg.loss:1.0370 | avg.acc:69.340
+
+[final] epo:best | 78.25933074951172 +- 0.441

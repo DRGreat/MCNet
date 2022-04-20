@@ -1,0 +1,4 @@
+Method|[7, 8]
+[train] epo:  1 | avg.loss:5.2141 | avg.acc:76.853
+[val] epo:  1 | avg.loss:0.8388 | avg.acc:83.667
+

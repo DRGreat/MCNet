@@ -149,6 +149,7 @@ def parse_args(arg_mode):
     parser.add_argument('-lr', type=float, default=0.1, help='learning rate')
     parser.add_argument('-gamma', type=float, default=0.05, help='learning rate decay factor')
     parser.add_argument('-milestones', nargs='+', type=int, default=[60, 70], help='milestones for MultiStepLR')
+    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[7,8])
     parser.add_argument('-save_all', action='store_true', help='save models on each epoch')
 
     ''' about few-shot episodes '''

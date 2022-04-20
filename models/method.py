@@ -2,14 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.resnet import ResNet
 from models.feature_backbones.resnet18 import ResNet18
-from models.cca import CCA
 from models.scr import SCR, SelfCorrelationComputation
-from models.others.se import SqueezeExcitation
-from models.others.lsa import LocalSelfAttention
-from models.others.nlsa import NonLocalSelfAttention
-from models.others.sce import SpatialContextEncoder
 from models.cats import TransformerAggregator
 from functools import reduce, partial
 from models.mod import FeatureL2Norm
@@ -35,8 +29,7 @@ class Method(nn.Module):
         # hyperpixel_ids = [2,5,8,11]
 
         channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
-        # hyperpixel_ids = [2,4,6,8]
-        hyperpixel_ids = [6,7,8]
+        hyperpixel_ids = args.hyperpixel_ids
 
         self.encoder = ResNet18(freeze=False,feature_size=feature_size,hyperpixel_ids=hyperpixel_ids)
         self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])

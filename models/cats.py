@@ -97,10 +97,10 @@ class MultiscaleBlock(nn.Module):
         x = x.flatten(0, 1) #[75x25x4,9,12]
         x = x + self.drop_path(self.attn(self.norm1(x)))
         x = x + self.drop_path(self.mlp2(self.norm4(x)))
-        x = x.view(B, N, H, W).transpose(1, 2).flatten(0, 1) #[75x25x9,4,12]
-        x = x + self.drop_path(self.attn_multiscale(self.norm3(x)))
-        x = x.view(B, H, N, W).transpose(1, 2).flatten(0, 1) #[75x25x4,9,12]
-        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        # x = x.view(B, N, H, W).transpose(1, 2).flatten(0, 1) #[75x25x9,4,12]
+        # x = x + self.drop_path(self.attn_multiscale(self.norm3(x)))
+        # x = x.view(B, H, N, W).transpose(1, 2).flatten(0, 1) #[75x25x4,9,12]
+        # x = x + self.drop_path(self.mlp(self.norm2(x)))
         x = x.view(B, N, H, W) #[75x25,4,9,12]
         return x
 
