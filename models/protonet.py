@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.resnet import ResNet
+from models.resnet12 import ResNet12
 from models.cca import CCA
 from models.scr import SCR, SelfCorrelationComputation
 from models.others.se import SqueezeExcitation
@@ -18,7 +18,7 @@ class ProtoNet(nn.Module):
         self.mode = mode
         self.args = args
 
-        self.encoder = ResNet(args=args)
+        self.encoder = ResNet12(args=args)
         self.encoder_dim = 640
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
 

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from models.feature_backbones.resnet18 import ResNet18
+from models.resnet12 import ResNet12
 from models.scr import SCR, SelfCorrelationComputation
 from models.cats import TransformerAggregator
 from functools import reduce, partial
@@ -23,15 +24,15 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        # self.encoder = ResNet(args=args,feature_size=feature_size)
-        # self.encoder_dim = 1184
-        # channels =  [64] * 3 + [160] * 3 + [320] * 3 + [640] * 3
-        # hyperpixel_ids = [2,5,8,11]
+        channels =  [64]  + [160]  + [320]  + [640] 
+        hyperpixel_ids = [2, 3]
+        self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
 
-        channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
-        hyperpixel_ids = args.hyperpixel_ids
 
-        self.encoder = ResNet18(freeze=False,feature_size=feature_size,hyperpixel_ids=hyperpixel_ids)
+        # channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
+        # hyperpixel_ids = args.hyperpixel_ids
+        # self.encoder = ResNet18(freeze=False,feature_size=feature_size,hyperpixel_ids=hyperpixel_ids)
+
         self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])
 
         self.channels = channels
@@ -224,15 +225,6 @@ class Method(nn.Module):
     def encode(self, x, do_gap=True):
         feats = self.encoder(x)
         
-        # for idx, x in enumerate(feats):
-        #     if self.args.self_method:
-        #         identity = x
-        #         x = self.scr_module[idx](x)
-
-        #         if self.args.self_method == 'scr':
-        #             x = x + identity
-        #         x = F.relu(x, inplace=True)
-        #     feats[idx] = x
         x = torch.cat(feats,dim=1)
         
         return x

@@ -29,3 +29,4 @@ Method|[7, 8]
 [train] epo: 10 | avg.loss:2.9706 | avg.acc:75.407
 [val] epo: 10 | avg.loss:1.0376 | avg.acc:69.773
 
+[final] epo:best | 78.05001068115234 +- 0.444
