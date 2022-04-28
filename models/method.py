@@ -150,8 +150,8 @@ class Method(nn.Module):
         spt_feats_proj = []
         qry_feats_proj = []
         for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
-            corr = self.get_correlation_map(src, tgt, i, num_qry, way) #[75x25,9,9]
-            # corr = self.corr(self.l2norm(src), self.l2norm(tgt))
+            # corr = self.get_correlation_map(src, tgt, i, num_qry, way) #[75x25,9,9]
+            corr = self.corr(self.l2norm(src), self.l2norm(tgt))
             
             corrs.append(corr)
             spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,9,3]

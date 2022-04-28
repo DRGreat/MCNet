@@ -23,10 +23,10 @@ def plotLearningCurve(*paths):
                 line = f.readline()
         train.append(t)
         val.append(v)
-    train = np.array(train).transpose()[2:-1,:]
-    val = np.array(val).transpose()[2:-1,:]
+    train = np.array(train).transpose()
+    val = np.array(val).transpose()
 
-    fig = pplt.figure(suptitle='Learning curves')
+    fig = pplt.figure()
     ax = fig.subplot(xlabel='episode', ylabel='accuracy (%)')
     # ax.plot(train, lw=4, ls = ":")
     # ax.plot(val, lw=1)
@@ -35,18 +35,18 @@ def plotLearningCurve(*paths):
     ht = ax.plot(
         train, linewidth=1,
         cycle='ggplot',
-        labels=["a1","b1"],
-        ls=":"
+        labels=["OURS /train","RENet /train"],
+        ls="--"
     )
 
     hv = ax.plot(
-        val, linewidth=1,
+        val, linewidth=1.5,
         cycle='ggplot',
-        labels=["a","b"],
+        labels=["OURS /val","RENet /val"],
         ls="-"
     )
     
-    ax.legend([ht,hv], loc='lr')
+    ax.legend(ht+hv, loc='top',ncol=4)
 
     fig.savefig("learningcurve")
 
@@ -56,6 +56,7 @@ def plotLearningCurve(*paths):
 
 
 if __name__ == "__main__":
-    path1 = "/data/data-home/chenderong/work/renet/log/pretrain vs no-pretrain/miniimagenet_5way1shot_log25124221"
-    path2 = "/data/data-home/chenderong/work/renet/log/pretrain vs no-pretrain/miniimagenet_5way1shot_log25124359"
-    plotLearningCurve(path1,path2)
+
+    methodp = "/data/data-home/chenderong/work/renet/log/ablation/cat[7,8]/cub_5way1shot_log14201813"
+    RENetp = "/data/data-home/chenderong/work/renet/log/baseline/cub_5way1shot_log09140744"
+    plotLearningCurve(methodp, RENetp)
