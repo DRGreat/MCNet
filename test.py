@@ -3,6 +3,7 @@ import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import time
 
 from torch.utils.data import DataLoader
 
@@ -65,13 +66,33 @@ def test_main(model, args, logid):
 
     return test_acc, test_ci
 
+logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
+
 
 if __name__ == '__main__':
     args = setup_run(arg_mode='test')
 
-    ''' define model '''
+    model_trained_from = "miniimagenet"
+    args.save_path = os.path.join(f'checkpoints/{model_trained_from}/{args.shot}shot-{args.way}way/', args.extra_dir)
+    if model_trained_from == 'miniimagenet':
+        args.num_class = 64
+    elif model_trained_from == 'cub':
+        args.num_class = 100
+    elif model_trained_from == 'fc100':
+        args.num_class = 60
+    elif model_trained_from == 'tieredimagenet':
+        args.num_class = 351
+    elif model_trained_from == 'cifar_fs':
+        args.num_class = 64
+    elif model_trained_from == 'cars':
+        args.num_class = 130
+    elif model_trained_from == 'dogs':
+        args.num_class = 70
+    
     model = Method(args).cuda()
     # model = RENet(args).cuda()
     model = nn.DataParallel(model, device_ids=args.device_ids)
 
-    test_main(model, args)
+    
+
+    test_main(model, args, logid)
