@@ -1,3 +1,4 @@
 #这是.gitignore文件
 checkpoints/
 datasets/
+log/
