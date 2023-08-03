@@ -9,6 +9,10 @@ from models.others.se import SqueezeExcitation
 from models.others.lsa import LocalSelfAttention
 from models.others.nlsa import NonLocalSelfAttention
 from models.others.sce import SpatialContextEncoder
+from sklearn.manifold import TSNE
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
 
 
 class ProtoNet(nn.Module):
@@ -76,6 +80,7 @@ class ProtoNet(nn.Module):
         qry_ = qry.mean(dim=[-1,-2])
         spt_ext = spt_.unsqueeze(0).repeat(num_qry*way,1,1).contiguous().view(num_qry*way*way,-1)
         qry_ext = qry_.unsqueeze(1).repeat(1,way,1).contiguous().view(num_qry*way*way,-1)
+        # self.visualize(spt_ext,qry_ext)
 
         similarity_matrix = -F.pairwise_distance(spt_ext,qry_ext,p=2).contiguous().view(num_qry*way,way)
 
@@ -110,3 +115,33 @@ class ProtoNet(nn.Module):
             return F.adaptive_avg_pool2d(x, 1)
         else:
             return x
+
+    def visualize(self, t1, t2):
+        t1 = t1.view(75*5, 1024).cpu().detach()
+        label1 = [1,2,3,4,5] * 75
+        t2 = t2.view(75 * 5, 1024)[1:26:5,:].cpu().detach()
+        label2 = [7] * 5
+        t = torch.cat([t1,t2],dim=0)
+        label = label1 + label2
+        ts = TSNE(n_components=2, init="pca", random_state=0)
+        result = ts.fit_transform(t)
+        self.plot_embedding(result, label, 't-SNE Embedding of digits')
+        sys.exit()
+
+    def plot_embedding(self, data, label, title):
+        x_min, x_max = np.min(data, 0), np.max(data, 0)
+        data = (data - x_min) / (x_max - x_min)		# 对数据进行归一化处理
+        fig = plt.figure()		# 创建图形实例
+        ax = plt.subplot(111)		# 创建子图
+        # 遍历所有样本
+        dotdict = {1:'o',2:'x',3:'*',4:'.',5:'^',7:'@'}
+        for i in range(data.shape[0]):
+            # 在图中为每个数据点画出标签
+            plt.text(data[i, 0], data[i, 1], dotdict[label[i]], color=plt.cm.Set1(label[i] / 10),
+                    fontdict={'weight': 'bold', 'size': 7})
+        plt.xticks()		# 指定坐标的刻度
+        plt.yticks()
+        plt.title(title, fontsize=14)
+        plt.savefig("/data/data-home/chenderong/work/MCNet/visualizes/a.jpg")
+        # 返回值
+        return fig

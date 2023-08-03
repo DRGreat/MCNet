@@ -5,7 +5,7 @@ import wandb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import sys
 from torch.utils.data import DataLoader
 
 from common.meter import Meter
@@ -16,6 +16,10 @@ from models.renet import RENet
 from models.protonet import ProtoNet
 from models.method import Method
 from test import test_main, evaluate
+from thop import profile, clever_format
+from torchinfo import summary
+from ptflops import get_model_complexity_info
+
 
 logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
 
@@ -38,10 +42,13 @@ def train(epoch, model, loader, optimizer, args=None):
     
         data, train_labels = data.cuda(), train_labels.cuda()
         data_aux, train_labels_aux = data_aux.cuda(), train_labels_aux.cuda()
-
-
+    
         # Forward images (3, 84, 84) -> (C, H, W)
         model.module.mode = 'encoder'
+        # flops, params = profile(model,inputs=(data,))
+        # flops, params = clever_format([flops, params],'%3.f')
+        # print("flops:", flops," params:",params)
+        # summary(model,input_data=data)
         data = model(data)
         data_aux = model(data_aux)  # I prefer to separate feed-forwarding data and data_aux due to BN
 
@@ -58,7 +65,7 @@ def train(epoch, model, loader, optimizer, args=None):
         logits_aux = model(data_aux)
         loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
         loss_aux = loss_aux + absolute_loss
-
+        # break
         loss = args.lamb * epi_loss + loss_aux
 
         acc = compute_accuracy(logits, label)
@@ -99,13 +106,19 @@ def train_main(args):
     # model = RENet(args).cuda()
     # model = ProtoNet(args).cuda()
     model = Method(args).cuda()
+    # model.mode="encoder"
+    # macs, params = get_model_complexity_info(model, (3, 512, 512), as_strings=True,
+    #                                        print_per_layer_stat=True, verbose=True)
+    # print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+    # print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+    # print(sum(p.numel() for p in model.parameters()))
+    # summary(model)
+    # sys.exit()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
-        # f.write(f"{model.__class__.__name__}\n")
-        f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
+        f.write(f"{model.__class__.__name__}\n")
+        # f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
-
-    if not args.no_wandb:
-        wandb.watch(model)
+    # return model
     print(model)
     
 
@@ -115,6 +128,8 @@ def train_main(args):
 
     max_acc, max_epoch = 0.0, 0
     set_seed(args.seed)
+
+    start = time.time()
 
     for epoch in range(1, args.max_epoch + 1):
         start_time = time.time()
@@ -144,16 +159,18 @@ def train_main(args):
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
 
         lr_scheduler.step()
-
+    end = time.time()
+    with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        f.write(f"training time: {end - start} seconds")
     return model
 
 
 if __name__ == '__main__':
     args = setup_run(arg_mode='train')
-
+    args.logtest = False
     model = train_main(args)
-    test_acc, test_ci = test_main(model, args,logid)
+    args.logtest = True
+    # args.dataset = "cub"
+    test_acc, test_ci = test_main(model, args, logid)
 
-    if not args.no_wandb:
-        wandb.log({'test/acc': test_acc, 'test/confidence_interval': test_ci})
 

@@ -149,7 +149,7 @@ def parse_args(arg_mode):
     parser.add_argument('-lr', type=float, default=0.1, help='learning rate')
     parser.add_argument('-gamma', type=float, default=0.05, help='learning rate decay factor')
     parser.add_argument('-milestones', nargs='+', type=int, default=[60, 70], help='milestones for MultiStepLR')
-    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[7,8])
+    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[7, 8])
     parser.add_argument('-save_all', action='store_true', help='save models on each epoch')
 
     ''' about few-shot episodes '''
@@ -166,7 +166,7 @@ def parse_args(arg_mode):
     parser.add_argument('-temperature_attn', type=float, default=5.0, metavar='gamma', help='temperature for softmax in computing cross-attention')
 
     ''' about env '''
-    parser.add_argument('-gpu', default='0', help='the GPU ids e.g. \"0\", \"0,1\", \"0,1,2\", etc')
+    parser.add_argument('-gpu', default='1', help='the GPU ids e.g. \"0\", \"0,1\", \"0,1,2\", etc')
     parser.add_argument('-extra_dir', type=str, default='test222', help='extra dir name added to checkpoint dir')
     parser.add_argument('-seed', type=int, default=1, help='random seed')
     parser.add_argument('-no_wandb', action='store_true', help='not plotting learning curve on wandb',

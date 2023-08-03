@@ -8,7 +8,7 @@ import torch.nn.functional as F
 class ResNet18(nn.Module):
     def __init__(self,freeze=False, feature_size=16, hyperpixel_ids = [2,4,6,8]):
         super(ResNet18,self).__init__()
-        self.backbone = models.resnet18(pretrained=True)
+        self.backbone = models.resnet18(pretrained=False)
         self.feature_size = feature_size
         if freeze:
             for param in self.backbone.parameters():
