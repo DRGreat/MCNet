@@ -19,6 +19,7 @@ from test import test_main, evaluate
 from thop import profile, clever_format
 from torchinfo import summary
 from ptflops import get_model_complexity_info
+import matplotlib.pyplot as plt
 
 
 logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
@@ -131,11 +132,21 @@ def train_main(args):
 
     start = time.time()
 
+    train_losses = []  # 存储训练损失值
+    val_losses = []  # 存储验证损失值
+    train_accs = []  # 存储训练精度
+    val_accs = []  # 存储验证精度
+
     for epoch in range(1, args.max_epoch + 1):
         start_time = time.time()
 
         train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
         val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
+
+        train_losses.append(train_loss)  # 记录训练损失值
+        val_losses.append(val_loss)  # 记录验证损失值
+        train_accs.append(train_acc)  # 记录训练精度
+        val_accs.append(val_acc)  # 记录验证精度
 
         with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
@@ -162,6 +173,24 @@ def train_main(args):
     end = time.time()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
         f.write(f"training time: {end - start} seconds")
+
+        # 绘制学习曲线图
+        plt.figure(figsize=(12, 4))
+        plt.subplot(1, 2, 1)
+        plt.plot(range(1, args.max_epoch + 1), train_losses, label='Train Loss')
+        plt.plot(range(1, args.max_epoch + 1), val_losses, label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+
+        plt.subplot(1, 2, 2)
+        plt.plot(range(1, args.max_epoch + 1), train_accs, label='Train Accuracy')
+        plt.plot(range(1, args.max_epoch + 1), val_accs, label='Validation Accuracy')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.savefig("/data/data-home/chenderong/work/MCNet/visualizes/" + "learning_rate" + ".pdf",
+                    format="pdf")
     return model
 
 
