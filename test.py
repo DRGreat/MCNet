@@ -38,27 +38,10 @@ def evaluate(epoch, model, loader, args=None, set='val'):
             logits = model((data_shot.unsqueeze(0).repeat(args.num_gpu, 1, 1, 1, 1), data_query))
             loss = F.cross_entropy(logits, label)
             acc = compute_accuracy(logits, label)
-            # print(path)
-            # print(label)
-            # print(torch.argmax(logits, dim=1))
-            # print(acc)
-            
-            # if acc > 70 and acc < 100:
-            #     ttt += 1
-            #     if ttt == 4:
-            #         break
-
             loss_meter.update(loss.item())
             acc_meter.update(acc)
             tqdm_gen.set_description(f'[{set:^5}] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg()} (curr:{acc:.3f})')
-            # if args.logtest:
-            #     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
-            #         f.write(f'[test] | test_loss:{loss} | test_acc:{acc}\n')
-            # if acc > 78 and acc < 82:
-            #     print("*"*20)
-            #     print("acc", acc)
-            #     print("*"*20)
-            #     args.visualfile = args.visualfile + 1
+
 
     return loss_meter.avg(), acc_meter.avg(), acc_meter.confidence_interval()
 
@@ -72,16 +55,13 @@ def test_main(model, args, logid):
     Dataset = dataset_builder(args)
     test_set = Dataset('test', args, return_path=True)
     sampler = CategoriesSampler(test_set.label, args.test_episode, args.way, args.shot + args.query)
-    test_loader = DataLoader(test_set, batch_sampler=sampler, num_workers=8, pin_memory=True)
+    test_loader = DataLoader(test_set, batch_sampler=sampler, num_workers=8)
 
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
     print(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
         f.write(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
-
-    
-
     return test_acc, test_ci
 
 logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
@@ -110,7 +90,4 @@ if __name__ == '__main__':
     model = Method(args).cuda()
     # model = RENet(args).cuda()
     model = nn.DataParallel(model, device_ids=args.device_ids)
-
-    
-
     test_main(model, args, logid)

@@ -29,17 +29,11 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        # channels =  [64]  + [160]  + [320]  + [640] 
-        # hyperpixel_ids = [2, 3]
-        # self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
-
-
-        channels = [64] + [64] * 2 + [128] * 2 + [256] * 2 + [512] * 2
-        hyperpixel_ids = args.hyperpixel_ids
-        self.encoder = ResNet18(freeze=False,feature_size=feature_size,hyperpixel_ids=hyperpixel_ids)
+        channels =  [64]  + [160]  + [320]  + [640]
+        hyperpixel_ids = [3]
+        self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
 
         self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])
-
         self.channels = channels
         self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
@@ -125,7 +119,7 @@ class Method(nn.Module):
         if self.mode == 'fc':
             return self.fc_forward(input)
         elif self.mode == 'encoder':
-            return self.encode(input, False)
+            return self.encode(input)
         elif self.mode == 'cca':
             spt, qry = input
             return self.cca(spt, qry)
@@ -253,7 +247,7 @@ class Method(nn.Module):
     def normalize_feature(self, x):
         return x - x.mean(1).unsqueeze(1)
 
-    def encode(self, x, do_gap=True):
+    def encode(self, x):
         feats = self.encoder(x)
         
         x = torch.cat(feats,dim=1)

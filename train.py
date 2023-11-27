@@ -20,6 +20,7 @@ from thop import profile, clever_format
 from torchinfo import summary
 from ptflops import get_model_complexity_info
 import matplotlib.pyplot as plt
+import math
 
 
 logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
@@ -44,12 +45,8 @@ def train(epoch, model, loader, optimizer, args=None):
         data, train_labels = data.cuda(), train_labels.cuda()
         data_aux, train_labels_aux = data_aux.cuda(), train_labels_aux.cuda()
     
-        # Forward images (3, 84, 84) -> (C, H, W)
+        # Forward images (way*(shot+query), 3, 84, 84) -> (Size, C, H, W)
         model.module.mode = 'encoder'
-        # flops, params = profile(model,inputs=(data,))
-        # flops, params = clever_format([flops, params],'%3.f')
-        # print("flops:", flops," params:",params)
-        # summary(model,input_data=data)
         data = model(data)
         data_aux = model(data_aux)  # I prefer to separate feed-forwarding data and data_aux due to BN
 
@@ -76,8 +73,8 @@ def train(epoch, model, loader, optimizer, args=None):
         tqdm_gen.set_description(f'[train] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg():.3f} (curr:{acc:.3f})')
 
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
-        detect_grad_nan(model)
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
+        # detect_grad_nan(model)
         optimizer.step()
         optimizer.zero_grad()
 
@@ -85,51 +82,34 @@ def train(epoch, model, loader, optimizer, args=None):
 
 
 def train_main(args):
+    set_seed(args.seed)
     Dataset = dataset_builder(args)
 
     trainset = Dataset('train', args)
-    train_sampler = CategoriesSampler(trainset.label, len(trainset.data) // args.batch, args.way, args.shot + args.query)
-    train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8, pin_memory=False)
+    train_sampler = CategoriesSampler(trainset.label, math.ceil(len(trainset.data) / args.batch), args.way, args.shot + args.query)
+    train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8)
 
     trainset_aux = Dataset('train', args)
-    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=True, num_workers=8, pin_memory=False)
+    train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=True, num_workers=8)
 
     train_loaders = {'train_loader': train_loader, 'train_loader_aux': train_loader_aux}
 
 
     valset = Dataset('val', args)
     val_sampler = CategoriesSampler(valset.label, args.val_episode, args.way, args.shot + args.query)
-    val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=8, pin_memory=False)
+    val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=8)
     ''' fix val set for all epochs '''
     val_loader = [x for x in val_loader]
 
-    set_seed(args.seed)
-    # model = RENet(args).cuda()
-    # model = ProtoNet(args).cuda()
     model = Method(args).cuda()
-    # model.mode="encoder"
-    # macs, params = get_model_complexity_info(model, (3, 512, 512), as_strings=True,
-    #                                        print_per_layer_stat=True, verbose=True)
-    # print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
-    # print('{:<30}  {:<8}'.format('Number of parameters: ', params))
-    # print(sum(p.numel() for p in model.parameters()))
-    # summary(model)
-    # sys.exit()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
-        f.write(f"{model.__class__.__name__}\n")
-        # f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
+        # f.write(f"{model.__class__.__name__}\n")
+        f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
-    # return model
     print(model)
-    
-
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0005)
 
     max_acc, max_epoch = 0.0, 0
-    set_seed(args.seed)
-
     start = time.time()
 
     train_losses = []  # 存储训练损失值
@@ -139,10 +119,8 @@ def train_main(args):
 
     for epoch in range(1, args.max_epoch + 1):
         start_time = time.time()
-
         train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
         val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
-
         train_losses.append(train_loss)  # 记录训练损失值
         val_losses.append(val_loss)  # 记录验证损失值
         train_accs.append(train_acc)  # 记录训练精度
@@ -151,9 +129,6 @@ def train_main(args):
         with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
             f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
-
-        if not args.no_wandb:
-            wandb.log({'train/loss': train_loss, 'train/acc': train_acc, 'val/loss': val_loss, 'val/acc': val_acc}, step=epoch)
 
         if val_acc > max_acc:
             print(f'[ log ] *********A better model is found ({val_acc:.3f}) *********')
@@ -169,7 +144,6 @@ def train_main(args):
         print(f'[ log ] saving @ {args.save_path}')
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
 
-        lr_scheduler.step()
     end = time.time()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
         f.write(f"training time: {end - start} seconds")
@@ -189,7 +163,7 @@ def train_main(args):
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.legend()
-        plt.savefig("/data/data-home/chenderong/work/MCNet/visualizes/" + "learning_rate" + ".pdf",
+        plt.savefig(os.path.join(args.save_path, 'learning_rate.pdf'),
                     format="pdf")
     return model
 

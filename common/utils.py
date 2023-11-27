@@ -18,12 +18,6 @@ def setup_run(arg_mode='train'):
     args.save_path = os.path.join(f'checkpoints/{args.dataset}/{args.shot}shot-{args.way}way/', args.extra_dir)
     ensure_path(args.save_path)
 
-    if not args.no_wandb:
-        wandb.init(project=f'renet-{args.dataset}-{args.way}w{args.shot}s',
-                   config=args,
-                   save_code=True,
-                   name=args.extra_dir)
-
     if args.dataset == 'miniimagenet':
         args.num_class = 64
     elif args.dataset == 'cub':
