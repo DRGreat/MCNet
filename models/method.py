@@ -30,7 +30,7 @@ class Method(nn.Module):
         self.args = args
 
         channels =  [64]  + [160]  + [320]  + [640]
-        hyperpixel_ids = [3]
+        hyperpixel_ids = args.hyperpixel_ids
         self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
 
         self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])

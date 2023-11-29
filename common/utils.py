@@ -147,8 +147,8 @@ def parse_args(arg_mode):
     parser.add_argument('-num_heads', type=int, default=2, help='注意力头部的个数')
 
     parser.add_argument('-data_dir', type=str, default='datasets', help='dir of datasets')
-    parser.add_argument('-milestones', nargs='+', type=int, default=[60, 70], help='milestones for MultiStepLR')
-    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[7, 8])
+    parser.add_argument('-milestones', nargs='+', type=int, default=[0], help='milestones for MultiStepLR')
+    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[3])
     parser.add_argument('-save_all', action='store_true', help='save models on each epoch')
     parser.add_argument('-val_episode', type=int, default=200, help='number of validation episode')
     parser.add_argument('-test_episode', type=int, default=2000, help='number of testing episodes after training')
