@@ -106,7 +106,7 @@ class MultiscaleBlock(nn.Module):
 
 
 class TransformerAggregator(nn.Module):
-    def __init__(self, num_hyperpixel, img_size=3, embed_dim=12, depth=1, num_heads=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
+    def __init__(self, num_hyperpixel, img_size=5, embed_dim=30, depth=1, num_heads=6, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0., norm_layer=None):
         super().__init__()
         self.img_size = img_size

@@ -20,10 +20,10 @@ class Method(nn.Module):
     def __init__(self, 
     args,  
     mode=None,
-    feature_size=3,
-    feature_proj_dim=3,
-    depth=4,
-    num_heads=6,
+    feature_size=5,
+    feature_proj_dim=5,
+    depth=1,
+    num_heads=2,
     mlp_ratio=4):
         super().__init__()
         self.mode = mode
@@ -71,7 +71,7 @@ class Method(nn.Module):
      
         # reduce channel size via 1x1 conv
         spt = self.cca_1x1[idx](spt)
-        qry = self.cca_1x1[idx](qry) # [75x25,64,3,3]
+        qry = self.cca_1x1[idx](qry) # [75x25,64,5,5]
 
         # normalize channels for later cosine similarity
         spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
@@ -132,33 +132,33 @@ class Method(nn.Module):
 
     def cca(self, spt, qry):
         
-        spt = spt.squeeze(0)
+        spt = spt.squeeze(0) #shape of spt : [25, 640, 5, 5]
         # shifting channel activations by the channel mean
         spt = self.normalize_feature(spt)
-        qry = self.normalize_feature(qry)
+        qry = self.normalize_feature(qry) #shape of spt : [75, 640, 5, 5]
         way = spt.shape[0]
         num_qry = qry.shape[0]
 
 #----------------------------------cat--------------------------------------#
         channels = [self.channels[i] for i in self.hyperpixel_ids]
-        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:]) #[75x25,960,3,3]
-        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:]) #[75x25,960,3,3]
+        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25,640,5,5]
+        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:]) #[75x25,640,5,5]
         spt_feats = torch.split(spt_feats,channels,dim=1)
         qry_feats = torch.split(qry_feats,channels,dim=1)
         corrs = []
         spt_feats_proj = []
         qry_feats_proj = []
         for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
-            # corr = self.get_correlation_map(src, tgt, i, num_qry, way) #[75x25,9,9]
-            corr = self.corr(self.l2norm(src), self.l2norm(tgt))
+            corr = self.get_correlation_map(src, tgt, i, num_qry, way)#the shape of corr : [75x25, 25, 25]
+            # corr = self.corr(self.l2norm(src), self.l2norm(tgt)) #the shape of corr : [75x25, 25, 25]
             
             corrs.append(corr)
-            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,9,3]
-            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2))) #[75x25,9,3]
+            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,25,5]
+            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2))) #[75x25,25,5]
             
-        spt_feats = torch.stack(spt_feats_proj, dim=1) 
-        qry_feats = torch.stack(qry_feats_proj, dim=1)
-        corr = torch.stack(corrs, dim=1) #[75x25,4,9,9]
+        spt_feats = torch.stack(spt_feats_proj, dim=1) #[75x25,1,25,5]
+        qry_feats = torch.stack(qry_feats_proj, dim=1) #[75x25,1,25,5]
+        corr = torch.stack(corrs, dim=1) #[75x25,1,25,25]
         # corr = self.mutual_nn_filter(corr)
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
@@ -250,7 +250,7 @@ class Method(nn.Module):
     def encode(self, x):
         feats = self.encoder(x)
         
-        x = torch.cat(feats,dim=1)
+        x = torch.cat(feats,dim=1) #the shape of x : [way*(shot+query),640,5,5]
         
         return x
 

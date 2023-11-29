@@ -50,7 +50,6 @@ def train(epoch, model, loader, optimizer, args=None):
         data = model(data)
         data_aux = model(data_aux)  # I prefer to separate feed-forwarding data and data_aux due to BN
 
-
         # loss for batch
         model.module.mode = 'cca'
         data_shot, data_query = data[:k], data[k:]

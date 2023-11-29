@@ -49,11 +49,7 @@ class BasicBlock(nn.Module):
 
         return out
 
-# 1.图像经过第一个残差块之后，3x 84 x 84变成64 x42x42 (2 x 2最大池化) ;
-# 2.经过第二个残差块之后，变成160x21 x21;
-# 3.第三个残差块输出320x 10x 10;
-# 4.第四个残差块输出640x 5x 5。
-# 5.经过5 x 5的平均池化后输出640x 1 x 1,使用DropBlock防止过拟合，再按照channel展平为640维。
+
 class ResNet12(nn.Module):
 
     def __init__(self, args, feature_size, hyperpixel_ids, block=BasicBlock):
@@ -91,18 +87,22 @@ class ResNet12(nn.Module):
 
     def forward(self, x):
         feats = []
+        # 1.图像经过第一个残差块之后，3x 84 x 84变成64 x42x42 (2 x 2最大池化) ;
         x = self.layer1(x)
         if 0 in self.hyperpixel_ids:
             feats.append(x.clone())
 
+        # 2.经过第二个残差块之后，变成160x21 x21;
         x = self.layer2(x)
         if 1 in self.hyperpixel_ids:
             feats.append(x.clone())
 
+        # 3.第三个残差块输出320x 10x 10;
         x = self.layer3(x)
         if 2 in self.hyperpixel_ids:
             feats.append(x.clone())
 
+        # 4.第四个残差块输出640x 5x 5。
         x = self.layer4(x)
         if 3 in self.hyperpixel_ids:
             feats.append(x.clone())
