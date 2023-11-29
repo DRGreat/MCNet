@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import math
 
 
-logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
+logid = time.strftime("%Y.%m.%d-%H:%M:%S",time.localtime(time.time()))
 
 
 def train(epoch, model, loader, optimizer, args=None):
