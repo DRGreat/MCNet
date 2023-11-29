@@ -102,8 +102,8 @@ def train_main(args):
 
     model = Method(args).cuda()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
-        # f.write(f"{model.__class__.__name__}\n")
-        f.write(f"{model.__class__.__name__}|{model.hyperpixel_ids}\n")
+        f.write(f"{model.__class__.__name__}\n")
+        f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
     print(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0005)
@@ -145,7 +145,7 @@ def train_main(args):
 
     end = time.time()
     with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
-        f.write(f"training time: {end - start} seconds")
+        f.write(f"training time: {end - start} seconds\n")
 
         # 绘制学习曲线图
         plt.figure(figsize=(12, 4))

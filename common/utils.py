@@ -131,38 +131,29 @@ def parse_args(arg_mode):
     ''' about dataset '''
     parser.add_argument('-dataset', type=str, default='miniimagenet',
                         choices=['miniimagenet', 'cub', 'tieredimagenet', 'cifar_fs'])
-    parser.add_argument('-data_dir', type=str, default='datasets', help='dir of datasets')
-
-    ''' about training specs '''
-    parser.add_argument('-batch', type=int, default=128, help='auxiliary batch size')
-    parser.add_argument('-temperature', type=float, default=0.2, metavar='tau', help='temperature for metric-based loss')
-    parser.add_argument('-lamb', type=float, default=0.25, metavar='lambda', help='loss balancing term')
-
-    ''' about training schedules '''
-    parser.add_argument('-max_epoch', type=int, default=80, help='max epoch to run')
-    parser.add_argument('-lr', type=float, default=0.1, help='learning rate')
-    parser.add_argument('-gamma', type=float, default=0.05, help='learning rate decay factor')
-    parser.add_argument('-milestones', nargs='+', type=int, default=[60, 70], help='milestones for MultiStepLR')
-    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[7, 8])
-    parser.add_argument('-save_all', action='store_true', help='save models on each epoch')
-
-    ''' about few-shot episodes '''
+    parser.add_argument('-gpu', default='1', help='the GPU ids e.g. \"0\", \"0,1\", \"0,1,2\", etc')
+    parser.add_argument('-seed', type=int, default=1, help='random seed')
     parser.add_argument('-way', type=int, default=5, metavar='N', help='number of few-shot classes')
     parser.add_argument('-shot', type=int, default=1, metavar='K', help='number of shots')
     parser.add_argument('-query', type=int, default=15, help='number of query image per class')
+    parser.add_argument('-max_epoch', type=int, default=80, help='max epoch to run')
+    parser.add_argument('-lr', type=float, default=0.1, help='learning rate')
+    parser.add_argument('-gamma', type=float, default=0.05, help='learning rate decay factor')
+    parser.add_argument('-temperature_attn', type=float, default=5.0, metavar='gamma', help='temperature for softmax in computing cross-attention')
+    parser.add_argument('-temperature', type=float, default=0.2, metavar='tau', help='temperature for metric-based loss')
+    parser.add_argument('-batch', type=int, default=128, help='auxiliary batch size')
+    parser.add_argument('-lamb', type=float, default=0.25, metavar='lambda', help='loss balancing term')
+    parser.add_argument('-depth', type=int, default=1, help='注意力层的深度')
+    parser.add_argument('-num_heads', type=int, default=2, help='注意力头部的个数')
+
+    parser.add_argument('-data_dir', type=str, default='datasets', help='dir of datasets')
+    parser.add_argument('-milestones', nargs='+', type=int, default=[60, 70], help='milestones for MultiStepLR')
+    parser.add_argument('-hyperpixel_ids', nargs='+', type=int, default=[7, 8])
+    parser.add_argument('-save_all', action='store_true', help='save models on each epoch')
     parser.add_argument('-val_episode', type=int, default=200, help='number of validation episode')
     parser.add_argument('-test_episode', type=int, default=2000, help='number of testing episodes after training')
-
-    ''' about SCR '''
     parser.add_argument('-self_method', type=str, default='scr')
-
-    ''' about CCA '''
-    parser.add_argument('-temperature_attn', type=float, default=5.0, metavar='gamma', help='temperature for softmax in computing cross-attention')
-
-    ''' about env '''
-    parser.add_argument('-gpu', default='1', help='the GPU ids e.g. \"0\", \"0,1\", \"0,1,2\", etc')
     parser.add_argument('-extra_dir', type=str, default='test222', help='extra dir name added to checkpoint dir')
-    parser.add_argument('-seed', type=int, default=1, help='random seed')
     parser.add_argument('-no_wandb', action='store_true', help='not plotting learning curve on wandb',
                         default=arg_mode == 'test')  # train: enable logging / test: disable logging
     args = parser.parse_args()
