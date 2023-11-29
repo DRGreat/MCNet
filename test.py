@@ -46,7 +46,7 @@ def evaluate(epoch, model, loader, args=None, set='val'):
     return loss_meter.avg(), acc_meter.avg(), acc_meter.confidence_interval()
 
 
-def test_main(model, args, logid):
+def test_main(model, args, logfile_path):
 
     ''' load model '''
     model = load_model(model, os.path.join(args.save_path, 'max_acc.pth'))
@@ -60,7 +60,7 @@ def test_main(model, args, logid):
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
     print(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
-    with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+    with open(logfile_path,"a+") as f:
         f.write(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
     return test_acc, test_ci
 

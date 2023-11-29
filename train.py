@@ -25,7 +25,6 @@ import math
 
 logid = time.strftime("%Y.%m.%d-%H:%M:%S",time.localtime(time.time()))
 
-
 def train(epoch, model, loader, optimizer, args=None):
     model.train()
     train_loader = loader['train_loader']
@@ -81,6 +80,10 @@ def train(epoch, model, loader, optimizer, args=None):
 
 
 def train_main(args):
+    logfile_path = f"log/{args.dataset}/{args.way}way{args.shot}shot"
+    if not os.path.exists(logfile_path):
+        os.makedirs(logfile_path)
+    logfile_path = os.path.join(logfile_path,f"log{logid}")
     set_seed(args.seed)
     Dataset = dataset_builder(args)
 
@@ -101,7 +104,7 @@ def train_main(args):
     val_loader = [x for x in val_loader]
 
     model = Method(args).cuda()
-    with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+    with open(logfile_path,"a+") as f:
         f.write(f"{model.__class__.__name__}\n")
         f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
@@ -125,7 +128,7 @@ def train_main(args):
         train_accs.append(train_acc)  # 记录训练精度
         val_accs.append(val_acc)  # 记录验证精度
 
-        with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+        with open(logfile_path,"a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
             f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
 
@@ -144,35 +147,35 @@ def train_main(args):
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
 
     end = time.time()
-    with open(f"log/{args.dataset}_{args.way}way{args.shot}shot_log{logid}","a+") as f:
+    with open(logfile_path,"a+") as f:
         f.write(f"training time: {end - start} seconds\n")
 
-        # 绘制学习曲线图
-        plt.figure(figsize=(12, 4))
-        plt.subplot(1, 2, 1)
-        plt.plot(range(1, args.max_epoch + 1), train_losses, label='Train Loss')
-        plt.plot(range(1, args.max_epoch + 1), val_losses, label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
+    # 绘制学习曲线图
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(range(1, args.max_epoch + 1), train_losses, label='Train Loss')
+    plt.plot(range(1, args.max_epoch + 1), val_losses, label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
 
-        plt.subplot(1, 2, 2)
-        plt.plot(range(1, args.max_epoch + 1), train_accs, label='Train Accuracy')
-        plt.plot(range(1, args.max_epoch + 1), val_accs, label='Validation Accuracy')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.savefig(os.path.join(args.save_path, 'learning_rate.pdf'),
-                    format="pdf")
-    return model
+    plt.subplot(1, 2, 2)
+    plt.plot(range(1, args.max_epoch + 1), train_accs, label='Train Accuracy')
+    plt.plot(range(1, args.max_epoch + 1), val_accs, label='Validation Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.savefig(os.path.join(args.save_path, 'learning_rate.pdf'),
+                format="pdf")
+    return model, logfile_path
 
 
 if __name__ == '__main__':
     args = setup_run(arg_mode='train')
     args.logtest = False
-    model = train_main(args)
+    model, logfile_path = train_main(args)
     args.logtest = True
     # args.dataset = "cub"
-    test_acc, test_ci = test_main(model, args, logid)
+    test_acc, test_ci = test_main(model, args, logfile_path)
 
 
