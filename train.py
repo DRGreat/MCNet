@@ -80,10 +80,9 @@ def train(epoch, model, loader, optimizer, args=None):
 
 
 def train_main(args):
-    logfile_path = f"log/{args.dataset}/{args.way}way{args.shot}shot"
+    logfile_path = f"log/{args.dataset}/{args.way}way{args.shot}shot/{logid}"
     if not os.path.exists(logfile_path):
         os.makedirs(logfile_path)
-    logfile_path = os.path.join(logfile_path,f"log{logid}")
     set_seed(args.seed)
     Dataset = dataset_builder(args)
 
@@ -104,7 +103,7 @@ def train_main(args):
     val_loader = [x for x in val_loader]
 
     model = Method(args).cuda()
-    with open(logfile_path,"a+") as f:
+    with open(os.path.join(logfile_path, "log.txt"),"a+") as f:
         f.write(f"{model.__class__.__name__}\n")
         f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
@@ -128,7 +127,7 @@ def train_main(args):
         train_accs.append(train_acc)  # 记录训练精度
         val_accs.append(val_acc)  # 记录验证精度
 
-        with open(logfile_path,"a+") as f:
+        with open(os.path.join(logfile_path, "log.txt"),"a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
             f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
 
@@ -147,7 +146,7 @@ def train_main(args):
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
 
     end = time.time()
-    with open(logfile_path,"a+") as f:
+    with open(os.path.join(logfile_path, "log.txt"),"a+") as f:
         f.write(f"training time: {end - start} seconds\n")
 
     # 绘制学习曲线图
@@ -165,7 +164,7 @@ def train_main(args):
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend()
-    plt.savefig(os.path.join(args.save_path, 'learning_rate.pdf'),
+    plt.savefig(os.path.join(logfile_path, 'learning_rate.pdf'),
                 format="pdf")
     return model, logfile_path
 

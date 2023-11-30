@@ -28,7 +28,6 @@ def evaluate(epoch, model, loader, args=None, set='val'):
     ttt = 0
     with torch.no_grad():
         for i, (data, labels) in enumerate(tqdm_gen, 1):
-            
             data = data.cuda()
             model.module.mode = 'encoder'
             data = model(data)
@@ -40,14 +39,13 @@ def evaluate(epoch, model, loader, args=None, set='val'):
             acc = compute_accuracy(logits, label)
             loss_meter.update(loss.item())
             acc_meter.update(acc)
-            tqdm_gen.set_description(f'[{set:^5}] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg()} (curr:{acc:.3f})')
-
+            tqdm_gen.set_description(
+                f'[{set:^5}] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg()} (curr:{acc:.3f})')
 
     return loss_meter.avg(), acc_meter.avg(), acc_meter.confidence_interval()
 
 
 def test_main(model, args, logfile_path):
-
     ''' load model '''
     model = load_model(model, os.path.join(args.save_path, 'max_acc.pth'))
 
@@ -60,12 +58,12 @@ def test_main(model, args, logfile_path):
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
     print(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
-    with open(logfile_path,"a+") as f:
+    with open(os.path.join(logfile_path, "log"), "a+") as f:
         f.write(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
     return test_acc, test_ci
 
-logid = time.strftime("%d%H%M%S",time.localtime(time.time()))
 
+logid = time.strftime("%d%H%M%S", time.localtime(time.time()))
 
 if __name__ == '__main__':
     args = setup_run(arg_mode='test')
@@ -86,7 +84,7 @@ if __name__ == '__main__':
         args.num_class = 130
     elif model_trained_from == 'dogs':
         args.num_class = 70
-    
+
     model = Method(args).cuda()
     # model = RENet(args).cuda()
     model = nn.DataParallel(model, device_ids=args.device_ids)
