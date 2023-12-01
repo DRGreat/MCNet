@@ -58,7 +58,7 @@ def test_main(model, args, logfile_path):
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
     print(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
-    with open(os.path.join(logfile_path, "log"), "a+") as f:
+    with open(os.path.join(logfile_path, "log.txt"), "a+") as f:
         f.write(f'[final] epo:{"best":>3} | {test_acc} +- {test_ci:.3f}')
     return test_acc, test_ci
 
