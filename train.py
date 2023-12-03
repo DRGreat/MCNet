@@ -72,7 +72,7 @@ def train(epoch, model, loader, optimizer, args=None):
 
         loss.backward()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
-        # detect_grad_nan(model)
+        detect_grad_nan(model)
         optimizer.step()
         optimizer.zero_grad()
 
