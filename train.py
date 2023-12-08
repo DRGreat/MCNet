@@ -22,8 +22,8 @@ from ptflops import get_model_complexity_info
 import matplotlib.pyplot as plt
 import math
 
+logid = time.strftime("%Y.%m.%d-%H:%M:%S", time.localtime(time.time()))
 
-logid = time.strftime("%Y.%m.%d-%H:%M:%S",time.localtime(time.time()))
 
 def train(epoch, model, loader, optimizer, args=None):
     model.train()
@@ -40,10 +40,9 @@ def train(epoch, model, loader, optimizer, args=None):
     tqdm_gen = tqdm.tqdm(train_loader)
 
     for i, ((data, train_labels), (data_aux, train_labels_aux)) in enumerate(zip(tqdm_gen, train_loader_aux), 1):
-    
         data, train_labels = data.cuda(), train_labels.cuda()
         data_aux, train_labels_aux = data_aux.cuda(), train_labels_aux.cuda()
-    
+
         # Forward images (way*(shot+query), 3, 84, 84) -> (Size, C, H, W)
         model.module.mode = 'encoder'
         data = model(data)
@@ -62,13 +61,14 @@ def train(epoch, model, loader, optimizer, args=None):
         loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
         loss_aux = loss_aux + absolute_loss
         # break
-        loss = args.lamb * epi_loss + loss_aux
+        loss = args.lamb * epi_loss + (1 - args.lamb) * loss_aux
 
         acc = compute_accuracy(logits, label)
 
         loss_meter.update(loss.item())
         acc_meter.update(acc)
-        tqdm_gen.set_description(f'[train] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg():.3f} (curr:{acc:.3f})')
+        tqdm_gen.set_description(
+            f'[train] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg():.3f} (curr:{acc:.3f})')
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
@@ -87,14 +87,14 @@ def train_main(args):
     Dataset = dataset_builder(args)
 
     trainset = Dataset('train', args)
-    train_sampler = CategoriesSampler(trainset.label, math.ceil(len(trainset.data) / args.batch), args.way, args.shot + args.query)
+    train_sampler = CategoriesSampler(trainset.label, math.ceil(len(trainset.data) / args.batch), args.way,
+                                      args.shot + args.query)
     train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8)
 
     trainset_aux = Dataset('train', args)
     train_loader_aux = DataLoader(dataset=trainset_aux, batch_size=args.batch, shuffle=True, num_workers=8)
 
     train_loaders = {'train_loader': train_loader, 'train_loader_aux': train_loader_aux}
-
 
     valset = Dataset('val', args)
     val_sampler = CategoriesSampler(valset.label, args.val_episode, args.way, args.shot + args.query)
@@ -103,7 +103,7 @@ def train_main(args):
     val_loader = [x for x in val_loader]
 
     model = Method(args).cuda()
-    with open(os.path.join(logfile_path, "log.txt"),"a+") as f:
+    with open(os.path.join(logfile_path, "log.txt"), "a+") as f:
         f.write(f"{model.__class__.__name__}\n")
         f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
@@ -127,7 +127,7 @@ def train_main(args):
         train_accs.append(train_acc)  # 记录训练精度
         val_accs.append(val_acc)  # 记录验证精度
 
-        with open(os.path.join(logfile_path, "log.txt"),"a+") as f:
+        with open(os.path.join(logfile_path, "log.txt"), "a+") as f:
             f.write(f'[train] epo:{epoch:>3} | avg.loss:{train_loss:.4f} | avg.acc:{train_acc:.3f}\n')
             f.write(f'[val] epo:{epoch:>3} | avg.loss:{val_loss:.4f} | avg.acc:{val_acc:.3f}\n\n')
 
@@ -146,7 +146,7 @@ def train_main(args):
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
 
     end = time.time()
-    with open(os.path.join(logfile_path, "log.txt"),"a+") as f:
+    with open(os.path.join(logfile_path, "log.txt"), "a+") as f:
         f.write(f"training time: {end - start} seconds\n")
 
     # 绘制学习曲线图
@@ -176,5 +176,3 @@ if __name__ == '__main__':
     args.logtest = True
     # args.dataset = "cub"
     test_acc, test_ci = test_main(model, args, logfile_path)
-
-
