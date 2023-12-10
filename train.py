@@ -71,7 +71,7 @@ def train(epoch, model, loader, optimizer, args=None):
             f'[train] epo:{epoch:>3} | avg.loss:{loss_meter.avg():.4f} | avg.acc:{acc_meter.avg():.3f} (curr:{acc:.3f})')
 
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 100.0)
         detect_grad_nan(model)
         optimizer.step()
         optimizer.zero_grad()
