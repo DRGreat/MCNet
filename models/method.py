@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.rcParams['font.sans-serif'] = ['Times New Roman']
 import sys
+from vit_pytorch import ViT
 
 
 class Method(nn.Module):
@@ -31,13 +32,23 @@ class Method(nn.Module):
 
         channels =  [64]  + [160]  + [320]  + [640]
         hyperpixel_ids = args.hyperpixel_ids
-        self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
+        # self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
+        self.encoder = ViT(
+            image_size = 84,
+            patch_size = 14,
+            num_classes = 25,
+            dim = 1024,
+            depth = 6,
+            heads = 16,
+            mlp_dim = 2048,
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
 
         self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])
         self.channels = channels
         self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
-     
 
         self.feature_size = feature_size
         self.feature_proj_dim = feature_proj_dim
@@ -250,8 +261,8 @@ class Method(nn.Module):
     def encode(self, x):
         feats = self.encoder(x)
         
-        x = torch.cat(feats,dim=1) #the shape of x : [way*(shot+query),640,5,5]
-        
+        # x = torch.cat(feats,dim=1) #the shape of x : [way*(shot+query),640,5,5]
+        x = feats.reshape(feats.shape[0], 1, 5, 5)
         return x
 
     def plot_embedding(self, data, label, title):

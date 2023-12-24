@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.autograd import Variable
-
 r'''
 Copy-pasted from GLU-Net
 https://github.com/PruneTruong/GLU-Net
