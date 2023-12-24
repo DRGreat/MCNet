@@ -154,8 +154,8 @@ class Method(nn.Module):
         channels = [self.channels[i] for i in self.hyperpixel_ids]
         spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25,640,5,5]
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:]) #[75x25,640,5,5]
-        spt_feats = torch.split(spt_feats,channels,dim=1)
-        qry_feats = torch.split(qry_feats,channels,dim=1)
+        spt_feats = torch.split(spt_feats,[1],dim=1)
+        qry_feats = torch.split(qry_feats,[1],dim=1)
         corrs = []
         spt_feats_proj = []
         qry_feats_proj = []
