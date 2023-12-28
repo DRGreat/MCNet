@@ -21,8 +21,8 @@ class Method(nn.Module):
     def __init__(self, 
     args,  
     mode=None,
-    feature_size=1,
-    feature_proj_dim=5,
+    feature_size=5,
+    feature_proj_dim=1,
     depth=1,
     num_heads=2,
     mlp_ratio=4):
@@ -161,11 +161,11 @@ class Method(nn.Module):
             corr = self.corr(self.l2norm(src), self.l2norm(tgt)) #the shape of corr : [75x25, 25, 25]
 
             corrs.append(corr)
-            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,25,5]
-            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2))) #[75x25,25,5]
+            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,25,1]
+            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2))) #[75x25,25,1]
 
-        spt_feats = torch.stack(spt_feats_proj, dim=1) #[75x25,1,25,5]
-        qry_feats = torch.stack(qry_feats_proj, dim=1) #[75x25,1,25,5]
+        spt_feats = torch.stack(spt_feats_proj, dim=1) #[75x25,1,25,1]
+        qry_feats = torch.stack(qry_feats_proj, dim=1) #[75x25,1,25,1]
         corr = torch.stack(corrs, dim=1) #[75x25,1,25,25]
         # corr = self.mutual_nn_filter(corr)
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
