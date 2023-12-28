@@ -260,7 +260,7 @@ class Method(nn.Module):
         
         # the shape of x : [way*(shot+query),1,5,5]
         # x = feats.reshape(feats.shape[0], 64, 3, 3)
-        x = feats.repeat(1,1,3,3)
+        x = feats.reshape(feats.shape[0], 640, 1, 1).repeat(1,1,3,3)
         return x
 
     def plot_embedding(self, data, label, title):
