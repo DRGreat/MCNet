@@ -21,7 +21,7 @@ class Method(nn.Module):
     def __init__(self, 
     args,  
     mode=None,
-    feature_size=5,
+    feature_size=1,
     feature_proj_dim=5,
     depth=1,
     num_heads=2,
@@ -31,13 +31,13 @@ class Method(nn.Module):
         self.args = args
 
         # channels =  [64]  + [160]  + [320]  + [640]
-        channels =  [1]  + [1]  + [1]  + [1]
+        channels =  [1]  + [1]  + [1]  + [640]
         hyperpixel_ids = args.hyperpixel_ids
         # self.encoder = ResNet12(args=args,feature_size=feature_size, hyperpixel_ids=hyperpixel_ids)
         self.encoder = ViT(
             image_size = 84,
             patch_size = 14,
-            num_classes = 5*5,
+            num_classes = 640,
             dim = 1024,
             depth = 6,
             heads = 16,
@@ -263,7 +263,7 @@ class Method(nn.Module):
         feats = self.encoder(x)
         
         # x = torch.cat(feats,dim=1) #the shape of x : [way*(shot+query),640,5,5]
-        x = feats.reshape(feats.shape[0], 1, 5, 5)
+        x = feats.reshape(feats.shape[0], 640, 1, 1)
         return x
 
     def plot_embedding(self, data, label, title):
