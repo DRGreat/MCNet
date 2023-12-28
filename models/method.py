@@ -21,8 +21,8 @@ class Method(nn.Module):
     def __init__(self, 
     args,  
     mode=None,
-    feature_size=5,
-    feature_proj_dim=1,
+    feature_size=3,
+    feature_proj_dim=3,
     depth=1,
     num_heads=2,
     mlp_ratio=4):
@@ -30,12 +30,12 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        channels =  [1]  + [1]  + [1]  + [1]
+        channels =  [1]  + [1]  + [1]  + [64]
         hyperpixel_ids = args.hyperpixel_ids
         self.encoder = ViT(
             image_size = 84,
             patch_size = 14,
-            num_classes = 25,
+            num_classes = 64*9,
             dim = 1024,
             depth = 6,
             heads = 16,
@@ -259,7 +259,7 @@ class Method(nn.Module):
         feats = self.encoder(x)
         
         # the shape of x : [way*(shot+query),1,5,5]
-        x = feats.reshape(feats.shape[0], 1, 5, 5)
+        x = feats.reshape(feats.shape[0], 64, 3, 3)
         return x
 
     def plot_embedding(self, data, label, title):
