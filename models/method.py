@@ -30,12 +30,12 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        channels =  [1]  + [1]  + [1]  + [64]
+        channels =  [1]  + [1]  + [1]  + [640]
         hyperpixel_ids = args.hyperpixel_ids
         self.encoder = ViT(
             image_size = 84,
             patch_size = 14,
-            num_classes = 64*9,
+            num_classes = 640,
             dim = 1024,
             depth = 6,
             heads = 16,
@@ -259,7 +259,8 @@ class Method(nn.Module):
         feats = self.encoder(x)
         
         # the shape of x : [way*(shot+query),1,5,5]
-        x = feats.reshape(feats.shape[0], 64, 3, 3)
+        # x = feats.reshape(feats.shape[0], 64, 3, 3)
+        x = feats.repeat(1,1,3,3)
         return x
 
     def plot_embedding(self, data, label, title):
