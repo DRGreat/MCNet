@@ -36,10 +36,10 @@ class Method(nn.Module):
             image_size = 84,
             patch_size = 14,
             num_classes = 640,
-            dim = 1280,
-            depth = 32,
+            dim = 1024,
+            depth = 24,
             heads = 16,
-            mlp_dim = 5120,
+            mlp_dim = 4096,
             dropout = 0.1,
             emb_dropout = 0.1
         )
