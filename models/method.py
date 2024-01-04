@@ -172,8 +172,8 @@ class Method(nn.Module):
         attn_q = corr_q.sum(dim=[2])
 
         # applying attention
-        spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[1:])
-        qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[1:])
+        spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[1:]) #[75, 25, 9]
+        qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[1:]) #[75, 25, 9]
 
 #----------------------------------cat--------------------------------------#
 
@@ -191,14 +191,9 @@ class Method(nn.Module):
             spt_attended = spt_attended.mean(dim=1)
             qry_attended = qry_attended.mean(dim=1)
 
-        # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
-        # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
-        spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
-        qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
 
-        # self.visualize(spt_attended_pooled, qry_attended_pooled)
 
-        similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)
+        similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
         # similarity_matrix = -F.pairwise_distance(spt_attended_pooled.view(num_qry*self.args.way,-1), qry_attended_pooled.view(num_qry*self.args.way,-1), p=2).view(num_qry,self.args.way)
 
         if self.training:
