@@ -33,16 +33,27 @@ class Method(nn.Module):
         vit_dim = feature_size ** 2
         self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
+        # self.encoder = ViT(
+        #     image_size = 84,
+        #     patch_size = 14,
+        #     num_classes = vit_dim,
+        #     dim = 1024,
+        #     depth = 24,
+        #     heads = 16,
+        #     mlp_dim = 4096,
+        #     dropout = 0.1,
+        #     emb_dropout = 0.1
+        # )
         self.encoder = ViT(
-            image_size = 84,
-            patch_size = 14,
-            num_classes = vit_dim,
-            dim = 1024,
-            depth = 24,
-            heads = 16,
-            mlp_dim = 4096,
-            dropout = 0.1,
-            emb_dropout = 0.1
+            image_size=84,
+            patch_size=14,
+            num_classes=vit_dim,
+            dim=128,
+            depth=2,
+            heads=2,
+            mlp_dim=128,
+            dropout=0.1,
+            emb_dropout=0.1
         )
 
         self.encoder_dim = vit_dim
@@ -141,9 +152,9 @@ class Method(nn.Module):
         spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
 
-        corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)) #the shape of corr : [75x25, 9, 9]
-        spt_feats_proj = self.proj(spt_feats) #[75x25,9]
-        qry_feats_proj = self.proj(qry_feats) #[75x25,9]
+        corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)).unsqueeze(1).repeat(1,2,1,1) #the shape of corr : [75x25,2, 9, 9]
+        spt_feats_proj = self.proj(spt_feats).unsqueeze(1).repeat(1,2,1) #[75x25,2,9]
+        qry_feats_proj = self.proj(qry_feats).unsqueeze(1).repeat(1,2,1) #[75x25,2,9]
 
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
