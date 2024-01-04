@@ -64,7 +64,7 @@ class Method(nn.Module):
         self.feature_proj_dim = feature_proj_dim
         self.decoder_embed_dim = self.feature_size ** 2 + self.feature_proj_dim
         self.args = args
-        self.proj = nn.Linear(vit_dim, vit_dim)
+        self.proj = nn.Linear(vit_dim, feature_proj_dim)
         self.decoder = TransformerAggregator(
             img_size=self.feature_size, embed_dim=self.decoder_embed_dim, depth=depth, num_heads=num_heads,
             mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -153,8 +153,8 @@ class Method(nn.Module):
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
 
         corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)).unsqueeze(1).repeat(1,2,1,1) #the shape of corr : [75x25,2, 9, 9]
-        spt_feats_proj = self.proj(spt_feats).unsqueeze(1).repeat(1,2,1) #[75x25,2,9]
-        qry_feats_proj = self.proj(qry_feats).unsqueeze(1).repeat(1,2,1) #[75x25,2,9]
+        spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 2, self.vit, 1) #[75x25,2,9,3]
+        qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 2, self.vit, 1) #[75x25,2,9,3]
 
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
