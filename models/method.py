@@ -136,8 +136,8 @@ class Method(nn.Module):
             raise ValueError('Unknown mode')
 
     def fc_forward(self, x):
-        x = x.mean(dim=[-1, -2])
-        return self.fc(x)
+
+        return x
 
     def cca(self, spt, qry):
 
