@@ -125,7 +125,7 @@ class Method(nn.Module):
             raise ValueError('Unknown mode')
 
     def fc_forward(self, x):
-
+        x = self.fc(x)
         return x
 
     def cca(self, spt, qry):

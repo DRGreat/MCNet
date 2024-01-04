@@ -57,7 +57,6 @@ def ensure_path(path):
 
 def compute_accuracy(logits, labels):
     pred = torch.argmax(logits, dim=1)
-    print(pred)
     return (pred == labels).type(torch.float).mean().item() * 100.
 
 _utils_pp = pprint.PrettyPrinter()
