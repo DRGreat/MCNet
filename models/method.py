@@ -31,6 +31,7 @@ class Method(nn.Module):
         self.args = args
 
         vit_dim = feature_size ** 2
+        self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
         self.encoder = ViT(
             image_size = 84,
@@ -236,7 +237,7 @@ class Method(nn.Module):
         
         # the shape of x : [way*(shot+query),1,5,5]
         # x = feats.reshape(feats.shape[0], 64, 3, 3)
-        x = feats.reshape(feats.shape[0], 640)
+        x = feats.reshape(feats.shape[0], self.vit_dim)
         return x
 
     def plot_embedding(self, data, label, title):
