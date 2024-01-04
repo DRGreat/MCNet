@@ -195,14 +195,14 @@ class Method(nn.Module):
         # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
         spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
         qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
-        qry_pooled = qry.mean(dim=[-1, -2])
+
         # self.visualize(spt_attended_pooled, qry_attended_pooled)
 
         similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)
         # similarity_matrix = -F.pairwise_distance(spt_attended_pooled.view(num_qry*self.args.way,-1), qry_attended_pooled.view(num_qry*self.args.way,-1), p=2).view(num_qry,self.args.way)
 
         if self.training:
-            return similarity_matrix / self.args.temperature, self.fc(qry_pooled)
+            return similarity_matrix / self.args.temperature, self.fc(qry)
         else:
             return similarity_matrix / self.args.temperature
 
