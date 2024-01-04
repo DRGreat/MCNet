@@ -33,27 +33,16 @@ class Method(nn.Module):
         vit_dim = feature_size ** 2
         self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
-        # self.encoder = ViT(
-        #     image_size = 84,
-        #     patch_size = 14,
-        #     num_classes = vit_dim,
-        #     dim = 1024,
-        #     depth = 24,
-        #     heads = 16,
-        #     mlp_dim = 4096,
-        #     dropout = 0.1,
-        #     emb_dropout = 0.1
-        # )
         self.encoder = ViT(
-            image_size=84,
-            patch_size=14,
-            num_classes=vit_dim,
-            dim=128,
-            depth=2,
-            heads=2,
-            mlp_dim=128,
-            dropout=0.1,
-            emb_dropout=0.1
+            image_size = 84,
+            patch_size = 14,
+            num_classes = vit_dim,
+            dim = 1024,
+            depth = 24,
+            heads = 16,
+            mlp_dim = 4096,
+            dropout = 0.1,
+            emb_dropout = 0.1
         )
 
         self.encoder_dim = vit_dim
