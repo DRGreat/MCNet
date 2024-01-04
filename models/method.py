@@ -171,14 +171,9 @@ class Method(nn.Module):
         attn_s = corr_s.sum(dim=[3])
         attn_q = corr_q.sum(dim=[2])
 
-        print(f"shape of attn_s {attn_s.shape}")
-        print(f"shape of attn_q {attn_q.shape}")
-        print(f"shape of spt_feats {spt_feats.shape}")
-        print(f"shape of qry_feats {qry_feats.shape}")
-
         # applying attention
-        spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[2:])
-        qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[2:])
+        spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[1:])
+        qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[1:])
 
 #----------------------------------cat--------------------------------------#
 
