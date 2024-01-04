@@ -155,6 +155,9 @@ class Method(nn.Module):
         corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)).unsqueeze(1).repeat(1,2,1,1) #the shape of corr : [75x25,2, 9, 9]
         spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 2, self.vit_dim, 1) #[75x25,2,9,3]
         qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 2, self.vit_dim, 1) #[75x25,2,9,3]
+        print(f"the shape of corr {corr.shape}")
+        print(f"the shape of spt_feats_proj {spt_feats_proj.shape}")
+        print(f"the shape of qry_feats_proj {qry_feats_proj.shape}")
 
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
