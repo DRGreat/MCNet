@@ -34,7 +34,7 @@ def evaluate(epoch, model, loader, args=None, set='val'):
             data_shot, data_query = data[:k], data[k:]
             model.module.mode = 'cca'
 
-            logits = model((data_shot.unsqueeze(0).repeat(args.num_gpu, 1, 1, 1, 1), data_query))
+            logits = model((data_shot, data_query))
             loss = F.cross_entropy(logits, label)
             acc = compute_accuracy(logits, label)
             loss_meter.update(loss.item())
