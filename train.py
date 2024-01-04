@@ -52,8 +52,7 @@ def train(epoch, model, loader, optimizer, args=None):
         model.module.mode = 'cca'
         data_shot, data_query = data[:k], data[k:]
         logits, absolute_logits = model((data_shot, data_query))
-        print(logits.shape)
-        print(label.shape)
+
         epi_loss = F.cross_entropy(logits, label)
         absolute_loss = F.cross_entropy(absolute_logits, train_labels[k:])
 
