@@ -141,9 +141,9 @@ class Method(nn.Module):
         spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
 
-        corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)).unsqueeze(1).repeat(1,2,1,1) #the shape of corr : [75x25,2, 9, 9]
-        spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 2, self.vit_dim, 1) #[75x25,2,9,3]
-        qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 2, self.vit_dim, 1) #[75x25,2,9,3]
+        corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)).unsqueeze(1).repeat(1,1,1,1) #the shape of corr : [75x25,2, 9, 9]
+        spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
+        qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
 
         refined_corr = self.decoder(corr, spt_feats_proj, qry_feats_proj).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
