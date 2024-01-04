@@ -30,12 +30,12 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        channels =  [1]  + [1]  + [1]  + [640]
+        vit_dim = feature_size ** 2
         hyperpixel_ids = args.hyperpixel_ids
         self.encoder = ViT(
             image_size = 84,
             patch_size = 14,
-            num_classes = 640,
+            num_classes = vit_dim,
             dim = 1024,
             depth = 24,
             heads = 16,
@@ -44,8 +44,7 @@ class Method(nn.Module):
             emb_dropout = 0.1
         )
 
-        self.encoder_dim = sum([channels[i] for i in hyperpixel_ids])
-        self.channels = channels
+        self.encoder_dim = vit_dim
         self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
 
@@ -53,19 +52,7 @@ class Method(nn.Module):
         self.feature_proj_dim = feature_proj_dim
         self.decoder_embed_dim = self.feature_size ** 2 + self.feature_proj_dim
         self.args = args
-        
-        self.proj = nn.ModuleList([
-            nn.Linear(channels[i], self.feature_proj_dim) for i in hyperpixel_ids
-        ])
-        self.cca_1x1 = nn.ModuleList([
-            nn.Sequential(
-            nn.Conv2d(channels[i], 64, kernel_size=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU()) for i in hyperpixel_ids
-        ])
-        self.scr_module = nn.ModuleList([
-            self._make_scr_layer(planes=[channels[i], 64, 64, 64, channels[i]]) for i in hyperpixel_ids
-            ])
+        self.proj = nn.Linear(vit_dim, vit_dim)
         self.decoder = TransformerAggregator(
             img_size=self.feature_size, embed_dim=self.decoder_embed_dim, depth=depth, num_heads=num_heads,
             mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -75,7 +62,9 @@ class Method(nn.Module):
 
 
     def corr(self, src, trg):
-        return src.flatten(2).transpose(-1, -2) @ trg.flatten(2)
+        outer_product_matrix = torch.bmm(src.unsqueeze(2), trg.unsqueeze(1))
+        # 去除多余的维度
+        return outer_product_matrix.squeeze()
     
     def get_correlation_map(self, spt, qry,idx,num_qry,way):
 
@@ -139,35 +128,22 @@ class Method(nn.Module):
         return self.fc(x)
 
     def cca(self, spt, qry):
-        
-        spt = spt.squeeze(0) #shape of spt : [25, 1, 5, 5]
+
         # shifting channel activations by the channel mean
-        spt = self.normalize_feature(spt)
-        qry = self.normalize_feature(qry) #shape of spt : [75, 1, 5, 5]
+        #shape of spt : [25, 9]
+        #shape of spt : [75, 9]
         way = spt.shape[0]
         num_qry = qry.shape[0]
 
 #----------------------------------cat--------------------------------------#
-        channels = [self.channels[i] for i in self.hyperpixel_ids]
-        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25,1,5,5]
-        qry_feats = qry.unsqueeze(1).repeat(1, way, 1, 1, 1).view(-1,*qry.size()[1:]) #[75x25,1,5,5]
-        spt_feats = torch.split(spt_feats,channels,dim=1)
-        qry_feats = torch.split(qry_feats,channels,dim=1)
-        corrs = []
-        spt_feats_proj = []
-        qry_feats_proj = []
-        for i, (src, tgt) in enumerate(zip(spt_feats, qry_feats)):
-            # corr = self.get_correlation_map(src, tgt, i, num_qry, way)#the shape of corr : [75x25, 25, 25]
-            corr = self.corr(self.l2norm(src), self.l2norm(tgt)) #the shape of corr : [75x25, 25, 25]
 
-            corrs.append(corr)
-            spt_feats_proj.append(self.proj[i](src.flatten(2).transpose(-1, -2))) #[75x25,25,1]
-            qry_feats_proj.append(self.proj[i](tgt.flatten(2).transpose(-1, -2))) #[75x25,25,1]
+        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
+        qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
 
-        spt_feats = torch.stack(spt_feats_proj, dim=1) #[75x25,1,25,1]
-        qry_feats = torch.stack(qry_feats_proj, dim=1) #[75x25,1,25,1]
-        corr = torch.stack(corrs, dim=1) #[75x25,1,25,25]
-        # corr = self.mutual_nn_filter(corr)
+        corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)) #the shape of corr : [75x25, 9, 9]
+        spt_feats_proj = self.proj(spt_feats) #[75x25,9]
+        qry_feats_proj = self.proj(qry_feats) #[75x25,9]
+
         refined_corr = self.decoder(corr, spt_feats, qry_feats).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size,self.feature_size)
         corr_q = refined_corr.view(num_qry, way, self.feature_size,self.feature_size, self.feature_size*self.feature_size)
@@ -260,7 +236,7 @@ class Method(nn.Module):
         
         # the shape of x : [way*(shot+query),1,5,5]
         # x = feats.reshape(feats.shape[0], 64, 3, 3)
-        x = feats.reshape(feats.shape[0], 640, 1, 1).repeat(1,1,3,3)
+        x = feats.reshape(feats.shape[0], 640)
         return x
 
     def plot_embedding(self, data, label, title):
