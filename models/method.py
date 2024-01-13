@@ -11,21 +11,24 @@ from models.mod import FeatureL2Norm
 from sklearn.manifold import TSNE
 import numpy as np
 import matplotlib.pyplot as plt
+
 plt.rcParams['font.sans-serif'] = ['Times New Roman']
 import sys
 from vit_pytorch import ViT
+from common.utils import *
+from models.feature_backbones.vision_transformer import vit_small
 
 
 class Method(nn.Module):
 
-    def __init__(self, 
-    args,  
-    mode=None,
-    feature_size=3,
-    feature_proj_dim=3,
-    depth=1,
-    num_heads=2,
-    mlp_ratio=4):
+    def __init__(self,
+                 args,
+                 mode=None,
+                 feature_size=3,
+                 feature_proj_dim=3,
+                 depth=1,
+                 num_heads=2,
+                 mlp_ratio=4):
         super().__init__()
         self.mode = mode
         self.args = args
@@ -33,18 +36,11 @@ class Method(nn.Module):
         vit_dim = feature_size ** 2
         self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
-        self.encoder = ViT(
-            image_size = 84,
-            patch_size = 14,
-            num_classes = vit_dim,
-            dim = 768,
-            depth = 12,
-            heads = 12,
-            mlp_dim = 3072,
-            dropout = 0.1,
-            emb_dropout = 0.1
-        )
-
+        self.encoder = vit_small(patch_size=16, return_all_tokens=True)
+        chkpt = torch.load(f"/home/chenderong/work/MCNet/checkpoints/{args.dataset}/vit_weight/checkpoint1600.pth")
+        chkpt_state_dict = chkpt['teacher']
+        self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
+        self.classification_head = nn.Linear(384, self.vit_dim)
         self.encoder_dim = vit_dim
         self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
@@ -58,32 +54,29 @@ class Method(nn.Module):
             img_size=self.feature_size, embed_dim=self.decoder_embed_dim, depth=depth, num_heads=num_heads,
             mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6),
             num_hyperpixel=len(hyperpixel_ids))
-            
-        self.l2norm = FeatureL2Norm()
 
+        self.l2norm = FeatureL2Norm()
 
     def corr(self, src, trg):
         outer_product_matrix = torch.bmm(src.unsqueeze(2), trg.unsqueeze(1))
         # 去除多余的维度
         return outer_product_matrix.squeeze()
-    
-    def get_correlation_map(self, spt, qry,idx,num_qry,way):
 
-         # [75x25,1,5,5]
+    def get_correlation_map(self, spt, qry, idx, num_qry, way):
+
+        # [75x25,1,5,5]
 
         # normalize channels for later cosine similarity
         spt = F.normalize(spt, p=2, dim=1, eps=1e-8)
         qry = F.normalize(qry, p=2, dim=1, eps=1e-8)
 
-       
         spt = spt.view(num_qry, way, *spt.size()[1:])
         qry = qry.view(num_qry, way, *qry.size()[1:])
         similarity_map_einsum = torch.einsum('qncij,qnckl->qnijkl', spt, qry)
-        _,_,h,w,_,_ = similarity_map_einsum.size()
-        similarity_map = similarity_map_einsum.view(-1, h*w,h*w)
-        
-        return similarity_map
+        _, _, h, w, _, _ = similarity_map_einsum.size()
+        similarity_map = similarity_map_einsum.view(-1, h * w, h * w)
 
+        return similarity_map
 
     def mutual_nn_filter(self, correlation_matrix):
         r"""Mutual nearest neighbor filtering (Rocco et al. NeurIPS'18)"""
@@ -96,7 +89,6 @@ class Method(nn.Module):
         corr_trg = correlation_matrix / corr_trg_max
 
         return correlation_matrix * (corr_src * corr_trg)
-
 
     def _make_scr_layer(self, planes):
         stride, kernel_size, padding = (1, 1, 1), (3, 3), 1
@@ -131,12 +123,12 @@ class Method(nn.Module):
     def cca(self, spt, qry):
 
         # shifting channel activations by the channel mean
-        #shape of spt : [25, 9]
-        #shape of qry : [75, 9]
+        # shape of spt : [25, 9]
+        # shape of qry : [75, 9]
         way = spt.shape[0]
         num_qry = qry.shape[0]
 
-#----------------------------------cat--------------------------------------#
+        # ----------------------------------cat--------------------------------------#
 
         # spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
         # qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
@@ -164,13 +156,12 @@ class Method(nn.Module):
         # spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[1:]) #[75, 25, 9]
         # qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[1:]) #[75, 25, 9]
 
-#----------------------------------cat--------------------------------------#
+        # ----------------------------------cat--------------------------------------#
 
         spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1)
         qry_attended = qry.unsqueeze(1).repeat(1, way, 1)
 
-#----------------------------------replace--------------------------------------#
-
+        # ----------------------------------replace--------------------------------------#
 
         # averaging embeddings for k > 1 shots
         if self.args.shot > 1:
@@ -178,8 +169,6 @@ class Method(nn.Module):
             qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
             spt_attended = spt_attended.mean(dim=1)
             qry_attended = qry_attended.mean(dim=1)
-
-
 
         similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
         # similarity_matrix = -F.pairwise_distance(spt_attended_pooled.view(num_qry*self.args.way,-1), qry_attended_pooled.view(num_qry*self.args.way,-1), p=2).view(num_qry,self.args.way)
@@ -191,25 +180,23 @@ class Method(nn.Module):
 
     def visualize(self, t1, t2):
 
-        
         t1 = t1.view(75 * 5, 1024).cpu().detach()
         t = t1[0].unsqueeze(0)
         offset = 1
         for i in range(5, 75 * 5, 5):
             t = torch.cat([t, t1[i + offset].unsqueeze(0)], dim=0)
             offset = (offset + 1) % 5
-        label1 = [1,2,3,4,5]*15
+        label1 = [1, 2, 3, 4, 5] * 15
 
         t2 = t2.view(75 * 5, 1024).cpu().detach()
         offset = 0
-        for i in range(0,75*5,5):
+        for i in range(0, 75 * 5, 5):
             t = torch.cat([t, t2[i + offset].unsqueeze(0)], dim=0)
             offset = (offset + 1) % 5
-        label2 = [6,7,8,9,10] * 15
+        label2 = [6, 7, 8, 9, 10] * 15
 
-        label = label1+label2
-        
-        
+        label = label1 + label2
+
         ts = TSNE(n_components=2, learning_rate="auto", init="pca", random_state=33)
         result = ts.fit_transform(t)
         self.plot_embedding(result, label, '')
@@ -220,35 +207,32 @@ class Method(nn.Module):
         x = torch.div(x - x_mean, torch.sqrt(x_var + eps))
         return x
 
-
     def normalize_feature(self, x):
         return x - x.mean(1).unsqueeze(1)
 
     def encode(self, x):
-        feats = self.encoder(x)
-        
-        # the shape of x : [way*(shot+query),1,5,5]
-        # x = feats.reshape(feats.shape[0], 64, 3, 3)
-        x = feats.reshape(feats.shape[0], self.vit_dim)
+        feats = self.encoder(x)[:,0,:]
+        x = self.classification_head(feats)
         return x
 
     def plot_embedding(self, data, label, title):
         # plt.rc('font',family='Times New Roman')
         x_min, x_max = np.min(data, 0), np.max(data, 0)
-        data = (data - x_min) / (x_max - x_min)		# 对数据进行归一化处理
-        fig = plt.figure()		# 创建图形实例
-        ax = plt.subplot(111)		# 创建子图
+        data = (data - x_min) / (x_max - x_min)  # 对数据进行归一化处理
+        fig = plt.figure()  # 创建图形实例
+        ax = plt.subplot(111)  # 创建子图
         # 遍历所有样本
-        
+
         for i in range(data.shape[0]):
             # 在图中为每个数据点画出标签
             plt.text(data[i, 0], data[i, 1], '.' if label[i] <= 5 else 'X', color=plt.cm.Set1(label[i] % 5),
-                    fontdict={'weight': 'bold', 'size': 28 if label[i] <= 5 else 14})
-        plt.xticks(fontproperties="Times New Roman")		# 指定坐标的刻度
+                     fontdict={'weight': 'bold', 'size': 28 if label[i] <= 5 else 14})
+        plt.xticks(fontproperties="Times New Roman")  # 指定坐标的刻度
         plt.yticks(fontproperties="Times New Roman")
         # plt.xticks()		# 指定坐标的刻度
         # plt.yticks()
         plt.title("Distribution of task" + str(self.args.visualfile) + " generated by ML", fontsize=14)
-        plt.savefig("/data/data-home/chenderong/work/MCNet/visualizes/" + str(self.args.visualfile) + ".pdf", format="pdf")
+        plt.savefig("/data/data-home/chenderong/work/MCNet/visualizes/" + str(self.args.visualfile) + ".pdf",
+                    format="pdf")
         # 返回值
         return fig
