@@ -122,8 +122,8 @@ def train_main(args):
 
     for epoch in range(1, args.max_epoch + 1):
         start_time = time.time()
-        val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
         train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
+        val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
 
         train_losses.append(train_loss)  # 记录训练损失值
         val_losses.append(val_loss)  # 记录验证损失值
