@@ -110,7 +110,8 @@ def train_main(args):
         f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
     print(model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0005)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
 
     max_acc, max_epoch = 0.0, 0
     start = time.time()
@@ -147,6 +148,7 @@ def train_main(args):
         epoch_time = time.time() - start_time
         print(f'[ log ] saving @ {args.save_path}')
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
+        lr_scheduler.step()
 
     end = time.time()
     with open(os.path.join(logfile_path, "log.txt"), "a+") as f:
