@@ -24,8 +24,8 @@ class Method(nn.Module):
     def __init__(self,
                  args,
                  mode=None,
-                 feature_size=3,
-                 feature_proj_dim=3,
+                 feature_size=18,
+                 feature_proj_dim=18,
                  depth=1,
                  num_heads=2,
                  mlp_ratio=4):
