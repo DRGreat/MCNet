@@ -41,13 +41,13 @@ class MiniImageNet(Dataset):
             image_size = 84
             resize_size = 92
 
+
             self.transform = transforms.Compose([
                 transforms.Resize([resize_size, resize_size]),
                 transforms.CenterCrop(image_size),
-
                 transforms.ToTensor(),
-                transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]),
-                                     np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))])
+                transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # ImageNet standard
+            ])
         elif setname == 'train':
             image_size = 84
             self.transform = transforms.Compose([
