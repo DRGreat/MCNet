@@ -110,7 +110,7 @@ def train_main(args):
         f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
     print(model)
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.005)
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
 
     max_acc, max_epoch = 0.0, 0
