@@ -36,7 +36,7 @@ class Method(nn.Module):
         vit_dim = feature_size ** 2
         self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
-        self.encoder = vit_small(patch_size=42, return_all_tokens=True)
+        self.encoder = vit_small(patch_size=16, return_all_tokens=True)
         chkpt = torch.load(f"/home/chenderong/work/MCNet/checkpoints/{args.dataset}/vit_weight/checkpoint1600.pth")
         chkpt_state_dict = chkpt['teacher']
         self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
