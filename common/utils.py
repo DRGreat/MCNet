@@ -10,7 +10,7 @@ from termcolor import colored
 
 def setup_run(arg_mode='train'):
     args = parse_args(arg_mode=arg_mode)
-    pprint(vars(args))
+    # pprint(vars(args))
 
     torch.set_printoptions(linewidth=100)
     args.num_gpu = set_gpu(args)
