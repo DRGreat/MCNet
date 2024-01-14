@@ -1,3 +1,4 @@
+import copy
 import os
 import tqdm
 import time
@@ -58,12 +59,12 @@ def train(epoch, model, loader, optimizer, args=None):
 
 
         # loss for auxiliary batch
-        # model.module.mode = 'fc'
-        # logits_aux = model(data_aux)
-        # loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
-        # loss_aux = loss_aux + absolute_loss
+        model.module.mode = 'fc'
+        logits_aux = model(data_aux)
+        loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
+        loss_aux = loss_aux + absolute_loss
         # break
-        loss = args.lamb * epi_loss + (1 - args.lamb) * absolute_loss
+        loss = args.lamb * epi_loss + (1 - args.lamb) * loss_aux
 
         acc = compute_accuracy(logits, label)
 
@@ -138,6 +139,7 @@ def train_main(args):
 
         if val_acc > max_acc:
             print(f'[ log ] *********A better model is found ({val_acc:.3f}) *********')
+            best_model = copy.deepcopy(model)
             max_acc, max_epoch = val_acc, epoch
             torch.save(dict(params=model.state_dict(), epoch=epoch), os.path.join(args.save_path, 'max_acc.pth'))
             torch.save(optimizer.state_dict(), os.path.join(args.save_path, 'optimizer_max_acc.pth'))
@@ -173,7 +175,7 @@ def train_main(args):
     plt.legend()
     plt.savefig(os.path.join(logfile_path, 'learning_rate.pdf'),
                 format="pdf")
-    return model, logfile_path
+    return best_model, logfile_path
 
 
 if __name__ == '__main__':
