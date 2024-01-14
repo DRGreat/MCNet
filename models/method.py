@@ -25,8 +25,8 @@ class Method(nn.Module):
     def __init__(self,
                  args,
                  mode=None,
-                 feature_size=8,
-                 feature_proj_dim=8,
+                 feature_size=3,
+                 feature_proj_dim=3,
                  depth=1,
                  num_heads=2,
                  mlp_ratio=4):
@@ -34,7 +34,7 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        vit_dim = 384
+        vit_dim = feature_size
         self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
         self.encoder = vit_small(patch_size=16, return_all_tokens=True)
@@ -135,33 +135,33 @@ class Method(nn.Module):
 
         # ----------------------------------cat--------------------------------------#
 
-        # spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
-        # qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
-        #
-        # corr = self.corr(spt_feats, qry_feats).unsqueeze(1).repeat(1,1,1,1) #the shape of corr : [75x25,2, 9, 9]
-        # spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
-        # qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
-        #
-        # refined_corr = self.decoder(corr, spt_feats_proj, qry_feats_proj).view(num_qry,way,*[self.feature_size]*4)
-        # corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
-        # corr_q = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
-        #
-        # # applying softmax for each side
-        # corr_s = F.softmax(corr_s / self.args.temperature_attn, dim=2)
-        # corr_q = F.softmax(corr_q / self.args.temperature_attn, dim=3)
-        #
-        # # suming up matching scores
-        # attn_s = corr_s.sum(dim=[3])
-        # attn_q = corr_q.sum(dim=[2])
-        #
-        # # applying attention
-        # spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[1:]) #[75, 25, 9]
-        # qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[1:]) #[75, 25, 9]
+        spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
+        qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
+
+        corr = self.corr(spt_feats, qry_feats).unsqueeze(1).repeat(1,1,1,1) #the shape of corr : [75x25,2, 9, 9]
+        spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
+        qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
+
+        refined_corr = self.decoder(corr, spt_feats_proj, qry_feats_proj).view(num_qry,way,*[self.feature_size]*4)
+        corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
+        corr_q = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
+
+        # applying softmax for each side
+        corr_s = F.softmax(corr_s / self.args.temperature_attn, dim=2)
+        corr_q = F.softmax(corr_q / self.args.temperature_attn, dim=3)
+
+        # suming up matching scores
+        attn_s = corr_s.sum(dim=[3])
+        attn_q = corr_q.sum(dim=[2])
+
+        # applying attention
+        spt_attended = attn_s * spt_feats.view(num_qry, way, *spt_feats.shape[1:]) #[75, 25, 9]
+        qry_attended = attn_q * qry_feats.view(num_qry, way, *qry_feats.shape[1:]) #[75, 25, 9]
 
         # ----------------------------------cat--------------------------------------#
 
-        spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1)
-        qry_attended = qry.unsqueeze(1).repeat(1, way, 1)
+        # spt_attended = spt.unsqueeze(0).repeat(num_qry, 1, 1)
+        # qry_attended = qry.unsqueeze(1).repeat(1, way, 1)
 
         # ----------------------------------replace--------------------------------------#
 
