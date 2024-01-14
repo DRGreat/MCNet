@@ -41,11 +41,7 @@ class Method(nn.Module):
         chkpt = torch.load(f"/home/chenderong/work/MCNet/checkpoints/{args.dataset}/vit_weight/checkpoint1600.pth")
         chkpt_state_dict = chkpt['teacher']
         self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
-        self.classification_head = nn.Sequential(
-            nn.Linear(384, 384),
-            nn.ReLU(),  # 使用ReLU激活函数
-            nn.Linear(384, self.vit_dim)
-        )
+        self.classification_head = nn.Linear(384, self.vit_dim)
         self.encoder_dim = vit_dim
         self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
@@ -61,7 +57,7 @@ class Method(nn.Module):
             num_hyperpixel=len(hyperpixel_ids))
 
         self.l2norm = FeatureL2Norm()
-        init.xavier_uniform_(self.decoder.weight)
+
         init.xavier_uniform_(self.classification_head.weight)
         init.xavier_uniform_(self.proj.weight)
         init.xavier_uniform_(self.fc.weight)
