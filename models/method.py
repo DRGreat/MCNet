@@ -170,7 +170,7 @@ class Method(nn.Module):
 
 
         # similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
-        similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=2)
+        similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=3)
 
         if self.training:
             return similarity_matrix / self.args.temperature, self.fc(qry)
