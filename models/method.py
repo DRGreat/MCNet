@@ -17,6 +17,7 @@ import sys
 from vit_pytorch import ViT
 from common.utils import *
 from models.feature_backbones.vision_transformer import vit_small
+import torch.nn.init as init
 
 
 class Method(nn.Module):
@@ -40,7 +41,11 @@ class Method(nn.Module):
         chkpt = torch.load(f"/home/chenderong/work/MCNet/checkpoints/{args.dataset}/vit_weight/checkpoint1600.pth")
         chkpt_state_dict = chkpt['teacher']
         self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
-        self.classification_head = nn.Linear(384, self.vit_dim)
+        self.classification_head = nn.Sequential(
+            nn.Linear(384, 384),
+            nn.ReLU(),  # 使用ReLU激活函数
+            nn.Linear(384, self.vit_dim)
+        )
         self.encoder_dim = vit_dim
         self.hyperpixel_ids = hyperpixel_ids
         self.fc = nn.Linear(self.encoder_dim, self.args.num_class)
@@ -56,6 +61,10 @@ class Method(nn.Module):
             num_hyperpixel=len(hyperpixel_ids))
 
         self.l2norm = FeatureL2Norm()
+        init.xavier_uniform_(self.decoder.weight)
+        init.xavier_uniform_(self.classification_head.weight)
+        init.xavier_uniform_(self.proj.weight)
+        init.xavier_uniform_(self.fc.weight)
 
     def corr(self, src, trg):
         outer_product_matrix = torch.bmm(src.unsqueeze(2), trg.unsqueeze(1))
@@ -133,16 +142,13 @@ class Method(nn.Module):
         spt_feats = spt.unsqueeze(0).repeat(num_qry, 1, 1).view(-1,*spt.size()[1:]) #shape of spt_feats [75x25, 9]
         qry_feats = qry.unsqueeze(1).repeat(1, way, 1).view(-1,*qry.size()[1:]) #[75x25, 9]
 
-        corr = self.corr(self.l2norm(spt_feats), self.l2norm(qry_feats)).unsqueeze(1).repeat(1,1,1,1) #the shape of corr : [75x25,2, 9, 9]
+        corr = self.corr(spt_feats, qry_feats).unsqueeze(1).repeat(1,1,1,1) #the shape of corr : [75x25,2, 9, 9]
         spt_feats_proj = self.proj(spt_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
         qry_feats_proj = self.proj(qry_feats).unsqueeze(1).unsqueeze(2).repeat(1, 1, self.vit_dim, 1) #[75x25,2,9,3]
 
         refined_corr = self.decoder(corr, spt_feats_proj, qry_feats_proj).view(num_qry,way,*[self.feature_size]*4)
         corr_s = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
         corr_q = refined_corr.view(num_qry, way, self.feature_size*self.feature_size, self.feature_size*self.feature_size)
-        # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
-        corr_s = self.gaussian_normalize(corr_s, dim=2)
-        corr_q = self.gaussian_normalize(corr_q, dim=3)
 
         # applying softmax for each side
         corr_s = F.softmax(corr_s / self.args.temperature_attn, dim=2)
