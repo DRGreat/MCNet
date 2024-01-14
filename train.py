@@ -55,6 +55,7 @@ def train(epoch, model, loader, optimizer, lr_scheduler, args=None):
 
         epi_loss = F.cross_entropy(logits, label)
         absolute_loss = F.cross_entropy(absolute_logits, train_labels[k:])
+        
 
         # loss for auxiliary batch
         model.module.mode = 'fc'

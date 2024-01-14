@@ -172,8 +172,8 @@ class Method(nn.Module):
             spt_attended = spt_attended.mean(dim=1)
             qry_attended = qry_attended.mean(dim=1)
 
-        similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
-        # similarity_matrix = -F.pairwise_distance(spt_attended_pooled.view(num_qry*self.args.way,-1), qry_attended_pooled.view(num_qry*self.args.way,-1), p=2).view(num_qry,self.args.way)
+        # similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
+        similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=2)
 
         if self.training:
             return similarity_matrix / self.args.temperature, self.fc(qry)
