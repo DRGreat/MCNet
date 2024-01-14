@@ -58,10 +58,6 @@ class Method(nn.Module):
 
         self.l2norm = FeatureL2Norm()
 
-        init.xavier_uniform_(self.classification_head.weight)
-        init.xavier_uniform_(self.proj.weight)
-        init.xavier_uniform_(self.fc.weight)
-
     def corr(self, src, trg):
         outer_product_matrix = torch.bmm(src.unsqueeze(2), trg.unsqueeze(1))
         # 去除多余的维度
@@ -173,8 +169,8 @@ class Method(nn.Module):
             qry_attended = qry_attended.mean(dim=1)
 
 
-        # similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
-        similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=2)
+        similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
+        # similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=2)
 
         if self.training:
             return similarity_matrix / self.args.temperature, self.fc(qry)
