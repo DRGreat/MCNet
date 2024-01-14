@@ -25,7 +25,7 @@ import math
 logid = time.strftime("%Y.%m.%d-%H:%M:%S", time.localtime(time.time()))
 
 
-def train(epoch, model, loader, optimizer, lr_scheduler, args=None):
+def train(epoch, model, loader, optimizer, args=None):
     model.train()
     train_loader = loader['train_loader']
     train_loader_aux = loader['train_loader_aux']
@@ -77,7 +77,6 @@ def train(epoch, model, loader, optimizer, lr_scheduler, args=None):
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 100.0)
         # detect_grad_nan(model)
         optimizer.step()
-        lr_scheduler.step()
 
     return loss_meter.avg(), acc_meter.avg(), acc_meter.confidence_interval()
 
@@ -112,9 +111,9 @@ def train_main(args):
     model = nn.DataParallel(model, device_ids=args.device_ids)
     # print(model)
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)
-    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=math.ceil(
-        len(trainset.data) / args.batch) * args.max_epoch, eta_min=0)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
+    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=math.ceil(
+    #     len(trainset.data) / args.batch) * args.max_epoch, eta_min=0)
     max_acc, max_epoch = 0.0, 0
     start = time.time()
 
@@ -125,7 +124,7 @@ def train_main(args):
 
     for epoch in range(1, args.max_epoch + 1):
         start_time = time.time()
-        train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, lr_scheduler, args)
+        train_loss, train_acc, _ = train(epoch, model, train_loaders, optimizer, args)
         val_loss, val_acc, _ = evaluate(epoch, model, val_loader, args, set='val')
 
         train_losses.append(train_loss)  # 记录训练损失值
@@ -150,6 +149,8 @@ def train_main(args):
         epoch_time = time.time() - start_time
         print(f'[ log ] saving @ {args.save_path}')
         print(f'[ log ] roughly {(args.max_epoch - epoch) / 3600. * epoch_time:.2f} h left\n')
+        lr_scheduler.step()
+
 
     end = time.time()
     with open(os.path.join(logfile_path, "log.txt"), "a+") as f:
