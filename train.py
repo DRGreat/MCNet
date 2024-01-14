@@ -55,7 +55,7 @@ def train(epoch, model, loader, optimizer, lr_scheduler, args=None):
 
         epi_loss = F.cross_entropy(logits, label)
         absolute_loss = F.cross_entropy(absolute_logits, train_labels[k:])
-        
+
 
         # loss for auxiliary batch
         model.module.mode = 'fc'
@@ -110,7 +110,7 @@ def train_main(args):
         f.write(f"{model.__class__.__name__}\n")
         f.write(f"{args}\n\n")
     model = nn.DataParallel(model, device_ids=args.device_ids)
-    print(model)
+    # print(model)
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)
     # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=math.ceil(
