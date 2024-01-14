@@ -208,7 +208,7 @@ class FeatureExtractionHyperPixel(nn.Module):
 
         # Up-sample & concatenate features to construct a hyperimage
         for idx, feat in enumerate(feats):
-            feats[idx] = F.interpolate(feat, self.feature_size, None, 'bilinear', True)
+            feats[idx] = F.interpolate(feat, self.feature_size, None, 'bilinear', True, recompute_scale_factor=True)
 
         return feats
 

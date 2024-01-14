@@ -48,7 +48,7 @@ class ResNet18(nn.Module):
             if hid + 1 in self.hyperpixel_ids:
                 feats.append(feat.clone())
         for idx, feat in enumerate(feats):
-            feats[idx] = F.interpolate(feat, self.feature_size, None, 'bilinear', True)
+            feats[idx] = F.interpolate(feat, self.feature_size, None, 'bilinear', True, recompute_scale_factor=True)
         
         return feats
 
