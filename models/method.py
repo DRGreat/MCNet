@@ -40,7 +40,7 @@ class Method(nn.Module):
         self.encoder = vit_small(patch_size=16, return_all_tokens=True)
         chkpt = torch.load(f"/home/chenderong/work/MCNet/checkpoints/{args.dataset}/vit_weight/checkpoint1600.pth")
         chkpt_state_dict = chkpt['teacher']
-        self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
+        # self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
         self.classification_head = nn.Linear(384, self.vit_dim)
         self.encoder_dim = vit_dim
         self.hyperpixel_ids = hyperpixel_ids
