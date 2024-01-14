@@ -34,7 +34,7 @@ class Method(nn.Module):
         self.mode = mode
         self.args = args
 
-        vit_dim = feature_size ** 2
+        vit_dim = 384
         self.vit_dim = vit_dim
         hyperpixel_ids = args.hyperpixel_ids
         self.encoder = vit_small(patch_size=16, return_all_tokens=True)
