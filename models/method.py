@@ -215,7 +215,7 @@ class Method(nn.Module):
 
     def encode(self, x):
         feats = self.encoder(x)[:,0,:]
-        # feats = self.classification_head(feats)
+        feats = self.classification_head(feats)
         return feats
 
     def plot_embedding(self, data, label, title):
