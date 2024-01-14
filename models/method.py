@@ -214,8 +214,8 @@ class Method(nn.Module):
 
     def encode(self, x):
         feats = self.encoder(x)[:,0,:]
-        # x = self.classification_head(feats)
-        return x
+        # feats = self.classification_head(feats)
+        return feats
 
     def plot_embedding(self, data, label, title):
         # plt.rc('font',family='Times New Roman')
