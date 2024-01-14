@@ -25,8 +25,8 @@ class Method(nn.Module):
     def __init__(self,
                  args,
                  mode=None,
-                 feature_size=10,
-                 feature_proj_dim=10,
+                 feature_size=15,
+                 feature_proj_dim=15,
                  depth=1,
                  num_heads=2,
                  mlp_ratio=4):
@@ -170,7 +170,7 @@ class Method(nn.Module):
 
 
         # similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
-        similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=3)
+        similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=4)
 
         if self.training:
             return similarity_matrix / self.args.temperature, self.fc(qry)
