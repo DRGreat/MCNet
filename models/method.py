@@ -40,7 +40,7 @@ class Method(nn.Module):
         self.encoder = vit_small(patch_size=16, return_all_tokens=True)
         chkpt = torch.load(f"/home/chenderong/work/MCNet/checkpoints/{args.dataset}/vit_weight/checkpoint1600.pth")
         chkpt_state_dict = chkpt['teacher']
-        # self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
+        self.encoder.load_state_dict(match_statedict(chkpt_state_dict), strict=False)
         self.classification_head = nn.Linear(384, self.vit_dim)
         self.encoder_dim = vit_dim
         self.hyperpixel_ids = hyperpixel_ids
@@ -171,6 +171,7 @@ class Method(nn.Module):
             qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
             spt_attended = spt_attended.mean(dim=1)
             qry_attended = qry_attended.mean(dim=1)
+
 
         # similarity_matrix = F.cosine_similarity(spt_attended, qry_attended, dim=-1)
         similarity_matrix = -F.pairwise_distance(spt_attended, qry_attended, p=2)
