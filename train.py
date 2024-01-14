@@ -58,12 +58,12 @@ def train(epoch, model, loader, optimizer, args=None):
 
 
         # loss for auxiliary batch
-        model.module.mode = 'fc'
-        logits_aux = model(data_aux)
-        loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
-        loss_aux = loss_aux + absolute_loss
+        # model.module.mode = 'fc'
+        # logits_aux = model(data_aux)
+        # loss_aux = F.cross_entropy(logits_aux, train_labels_aux)
+        # loss_aux = loss_aux + absolute_loss
         # break
-        loss = args.lamb * epi_loss + (1 - args.lamb) * loss_aux
+        loss = args.lamb * epi_loss + (1 - args.lamb) * absolute_loss
 
         acc = compute_accuracy(logits, label)
 
