@@ -70,7 +70,7 @@ def test_main(model, args, logid):
 
     ''' define test dataset '''
     Dataset = dataset_builder(args)
-    test_set = Dataset('test', args, return_path=True)
+    test_set = Dataset('test', args, return_path=False)
     sampler = CategoriesSampler(test_set.label, args.test_episode, args.way, args.shot + args.query)
     test_loader = DataLoader(test_set, batch_sampler=sampler, num_workers=8, pin_memory=True)
 
