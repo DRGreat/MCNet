@@ -25,8 +25,9 @@ def evaluate(epoch, model, loader, args=None, set='val'):
 
     k = args.way * args.shot
     tqdm_gen = tqdm.tqdm(loader)
-    for x in tqdm_gen:
-        print(x)
+    for data, labels in tqdm_gen:
+        print(data.shape)
+        print(labels.shape)
         import sys
         sys.exit(0)
     ttt = 0
