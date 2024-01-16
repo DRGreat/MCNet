@@ -25,12 +25,6 @@ def evaluate(epoch, model, loader, args=None, set='val'):
 
     k = args.way * args.shot
     tqdm_gen = tqdm.tqdm(loader)
-    for i, (data, labels) in enumerate(tqdm_gen, 1):
-        print(i)
-        print(data.shape)
-        print(labels.shape)
-        import sys
-        sys.exit(0)
     ttt = 0
     with torch.no_grad():
         for i, (data, labels) in enumerate(tqdm_gen, 1):
